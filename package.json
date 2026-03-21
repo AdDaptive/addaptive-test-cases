@@ -1,0 +1,38 @@
+{
+  "name": "addaptive-test-cases",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Standalone Playwright test suite for Addaptive.",
+  "scripts": {
+    "audit:katalon": "node migration-tools/audit-katalon.js",
+    "generate:profiles": "node migration-tools/generate-profile-env.js",
+    "generate:locators": "node migration-tools/generate-locators.js",
+    "generate:stubs": "node migration-tools/generate-playwright-stubs.js",
+    "generate:stubs:all": "node migration-tools/generate-playwright-stubs.js --limit=500",
+    "report:migration-status": "node migration-tools/generate-migration-status.js",
+    "show:report:latest": "node migration-tools/show-latest-playwright-report.js",
+    "migrate:bootstrap": "node migration-tools/audit-katalon.js && node migration-tools/generate-profile-env.js && node migration-tools/generate-locators.js && node migration-tools/generate-playwright-stubs.js --limit=5",
+    "test:oe:dpm:create": "ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID=${ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID:-} ADDAPTIVE_ORDER_ENTRY_DB_IDS=${ADDAPTIVE_ORDER_ENTRY_DB_IDS:-} ADDAPTIVE_ORDER_ENTRY_DB_RANGE=${ADDAPTIVE_ORDER_ENTRY_DB_RANGE:-} ADDAPTIVE_ORDER_ENTRY_AD_SERVER=DPM ADDAPTIVE_ORDER_ENTRY_ACTION=create npx playwright test tests/frontend/order-entry-end-to-end-batch.spec.ts --project=chromium",
+    "test:chrome:oe:dpm:create": "ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID=${ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID:-} ADDAPTIVE_ORDER_ENTRY_DB_IDS=${ADDAPTIVE_ORDER_ENTRY_DB_IDS:-} ADDAPTIVE_ORDER_ENTRY_DB_RANGE=${ADDAPTIVE_ORDER_ENTRY_DB_RANGE:-} ADDAPTIVE_ORDER_ENTRY_AD_SERVER=DPM ADDAPTIVE_ORDER_ENTRY_ACTION=create npx playwright test tests/frontend/order-entry-end-to-end-batch.spec.ts --project=chromium",
+    "test:chrome:oe:dpm:create:2x": "ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID=${ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID:-} ADDAPTIVE_ORDER_ENTRY_DB_IDS=${ADDAPTIVE_ORDER_ENTRY_DB_IDS:-} ADDAPTIVE_ORDER_ENTRY_DB_RANGE=${ADDAPTIVE_ORDER_ENTRY_DB_RANGE:-} ADDAPTIVE_ORDER_ENTRY_AD_SERVER=DPM ADDAPTIVE_ORDER_ENTRY_ACTION=create npx playwright test tests/frontend/order-entry-end-to-end-batch.spec.ts --project=chromium --workers=2",
+    "test:brave:oe:dpm:create": "ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID=${ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID:-} ADDAPTIVE_ORDER_ENTRY_DB_IDS=${ADDAPTIVE_ORDER_ENTRY_DB_IDS:-} ADDAPTIVE_ORDER_ENTRY_DB_RANGE=${ADDAPTIVE_ORDER_ENTRY_DB_RANGE:-} ADDAPTIVE_ORDER_ENTRY_AD_SERVER=DPM ADDAPTIVE_ORDER_ENTRY_ACTION=create npx playwright test tests/frontend/order-entry-end-to-end-batch.spec.ts --project=brave-ubuntu",
+    "test:brave:oe:dpm:create:2x": "ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID=${ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID:-} ADDAPTIVE_ORDER_ENTRY_DB_IDS=${ADDAPTIVE_ORDER_ENTRY_DB_IDS:-} ADDAPTIVE_ORDER_ENTRY_DB_RANGE=${ADDAPTIVE_ORDER_ENTRY_DB_RANGE:-} ADDAPTIVE_ORDER_ENTRY_AD_SERVER=DPM ADDAPTIVE_ORDER_ENTRY_ACTION=create npx playwright test tests/frontend/order-entry-end-to-end-batch.spec.ts --project=brave-ubuntu --workers=2",
+    "test:oe:dpm:edit": "ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID=${ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID:-} ADDAPTIVE_ORDER_ENTRY_DB_IDS=${ADDAPTIVE_ORDER_ENTRY_DB_IDS:-} ADDAPTIVE_ORDER_ENTRY_DB_RANGE=${ADDAPTIVE_ORDER_ENTRY_DB_RANGE:-} ADDAPTIVE_ORDER_ENTRY_AD_SERVER=DPM ADDAPTIVE_ORDER_ENTRY_ACTION=edit npx playwright test tests/frontend/order-entry-end-to-end-batch.spec.ts --project=chromium",
+    "test:chrome:oe:dpm:edit:2x": "ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID=${ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID:-} ADDAPTIVE_ORDER_ENTRY_DB_IDS=${ADDAPTIVE_ORDER_ENTRY_DB_IDS:-} ADDAPTIVE_ORDER_ENTRY_DB_RANGE=${ADDAPTIVE_ORDER_ENTRY_DB_RANGE:-} ADDAPTIVE_ORDER_ENTRY_AD_SERVER=DPM ADDAPTIVE_ORDER_ENTRY_ACTION=edit npx playwright test tests/frontend/order-entry-end-to-end-batch.spec.ts --project=chromium --workers=2",
+    "test:brave:oe:dpm:edit:2x": "ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID=${ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID:-} ADDAPTIVE_ORDER_ENTRY_DB_IDS=${ADDAPTIVE_ORDER_ENTRY_DB_IDS:-} ADDAPTIVE_ORDER_ENTRY_DB_RANGE=${ADDAPTIVE_ORDER_ENTRY_DB_RANGE:-} ADDAPTIVE_ORDER_ENTRY_AD_SERVER=DPM ADDAPTIVE_ORDER_ENTRY_ACTION=edit npx playwright test tests/frontend/order-entry-end-to-end-batch.spec.ts --project=brave-ubuntu --workers=2",
+    "test:oe:mm:create": "ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID=${ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID:-} ADDAPTIVE_ORDER_ENTRY_DB_IDS=${ADDAPTIVE_ORDER_ENTRY_DB_IDS:-} ADDAPTIVE_ORDER_ENTRY_DB_RANGE=${ADDAPTIVE_ORDER_ENTRY_DB_RANGE:-} ADDAPTIVE_ORDER_ENTRY_AD_SERVER=MEDIAMATH ADDAPTIVE_ORDER_ENTRY_ACTION=create npx playwright test tests/frontend/order-entry-end-to-end-batch.spec.ts --project=chromium",
+    "test:oe:mm-gam:create": "ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID=${ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID:-} ADDAPTIVE_ORDER_ENTRY_DB_IDS=${ADDAPTIVE_ORDER_ENTRY_DB_IDS:-} ADDAPTIVE_ORDER_ENTRY_DB_RANGE=${ADDAPTIVE_ORDER_ENTRY_DB_RANGE:-} ADDAPTIVE_ORDER_ENTRY_AD_SERVER=MEDIAMATH_GAM ADDAPTIVE_ORDER_ENTRY_ACTION=create npx playwright test tests/frontend/order-entry-end-to-end-batch.spec.ts --project=chromium",
+    "test:chrome:oe:mm:create:2x": "ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID=${ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID:-} ADDAPTIVE_ORDER_ENTRY_DB_IDS=${ADDAPTIVE_ORDER_ENTRY_DB_IDS:-} ADDAPTIVE_ORDER_ENTRY_DB_RANGE=${ADDAPTIVE_ORDER_ENTRY_DB_RANGE:-} ADDAPTIVE_ORDER_ENTRY_AD_SERVER=MEDIAMATH ADDAPTIVE_ORDER_ENTRY_ACTION=create npx playwright test tests/frontend/order-entry-end-to-end-batch.spec.ts --project=chromium --workers=2",
+    "test:brave:oe:mm:create:2x": "ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID=${ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID:-} ADDAPTIVE_ORDER_ENTRY_DB_IDS=${ADDAPTIVE_ORDER_ENTRY_DB_IDS:-} ADDAPTIVE_ORDER_ENTRY_DB_RANGE=${ADDAPTIVE_ORDER_ENTRY_DB_RANGE:-} ADDAPTIVE_ORDER_ENTRY_AD_SERVER=MEDIAMATH ADDAPTIVE_ORDER_ENTRY_ACTION=create npx playwright test tests/frontend/order-entry-end-to-end-batch.spec.ts --project=brave-ubuntu --workers=2",
+    "test:oe:mm:edit": "ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID=${ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID:-} ADDAPTIVE_ORDER_ENTRY_DB_IDS=${ADDAPTIVE_ORDER_ENTRY_DB_IDS:-} ADDAPTIVE_ORDER_ENTRY_DB_RANGE=${ADDAPTIVE_ORDER_ENTRY_DB_RANGE:-} ADDAPTIVE_ORDER_ENTRY_AD_SERVER=MEDIAMATH ADDAPTIVE_ORDER_ENTRY_ACTION=edit npx playwright test tests/frontend/order-entry-end-to-end-batch.spec.ts --project=chromium",
+    "test:oe:mm-gam:edit": "ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID=${ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID:-} ADDAPTIVE_ORDER_ENTRY_DB_IDS=${ADDAPTIVE_ORDER_ENTRY_DB_IDS:-} ADDAPTIVE_ORDER_ENTRY_DB_RANGE=${ADDAPTIVE_ORDER_ENTRY_DB_RANGE:-} ADDAPTIVE_ORDER_ENTRY_AD_SERVER=MEDIAMATH_GAM ADDAPTIVE_ORDER_ENTRY_ACTION=edit npx playwright test tests/frontend/order-entry-end-to-end-batch.spec.ts --project=chromium",
+    "test:chrome:oe:mm:edit:2x": "ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID=${ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID:-} ADDAPTIVE_ORDER_ENTRY_DB_IDS=${ADDAPTIVE_ORDER_ENTRY_DB_IDS:-} ADDAPTIVE_ORDER_ENTRY_DB_RANGE=${ADDAPTIVE_ORDER_ENTRY_DB_RANGE:-} ADDAPTIVE_ORDER_ENTRY_AD_SERVER=MEDIAMATH ADDAPTIVE_ORDER_ENTRY_ACTION=edit npx playwright test tests/frontend/order-entry-end-to-end-batch.spec.ts --project=chromium --workers=2",
+    "test:brave:oe:mm:edit:2x": "ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID=${ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID:-} ADDAPTIVE_ORDER_ENTRY_DB_IDS=${ADDAPTIVE_ORDER_ENTRY_DB_IDS:-} ADDAPTIVE_ORDER_ENTRY_DB_RANGE=${ADDAPTIVE_ORDER_ENTRY_DB_RANGE:-} ADDAPTIVE_ORDER_ENTRY_AD_SERVER=MEDIAMATH ADDAPTIVE_ORDER_ENTRY_ACTION=edit npx playwright test tests/frontend/order-entry-end-to-end-batch.spec.ts --project=brave-ubuntu --workers=2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0",
+    "dotenv": "^16.4.7",
+    "pg": "^8.19.0",
+    "typescript": "^5.8.2"
+  }
+}
