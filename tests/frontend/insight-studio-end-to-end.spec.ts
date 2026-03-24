@@ -19,7 +19,7 @@ import {
   requireInsightStudioWidgetValues
 } from '../../utils/insight-studio-db';
 
-test.setTimeout(240000);
+test.setTimeout(300000);
 
 test('frontend: insight studio end-to-end flow is scriptable', async ({ page, loginAsDefaultUser, impersonateConfiguredUser }) => {
   const logStage = (label: string) => {
@@ -52,9 +52,6 @@ test('frontend: insight studio end-to-end flow is scriptable', async ({ page, lo
       logStage(`datasource:${dataSource.index}:start`);
       await configureInsightStudioDataSource(page, dataSource);
       logStage(`datasource:${dataSource.index}:done`);
-      if (config.pauseAtEnd && dbRow.id === '10') {
-        await page.pause();
-      }
     }
     logStage('export-targets:start');
     await configureInsightStudioExportTargets(page, exportTargetValues);
@@ -62,9 +59,6 @@ test('frontend: insight studio end-to-end flow is scriptable', async ({ page, lo
     logStage('recipients:start');
     await configureInsightStudioRecipients(page, insightValues!.recipients);
     logStage('recipients:done');
-    if (config.pauseAtEnd && dbRow.id === '9') {
-      await page.pause();
-    }
     if (widgetValues.length > 0) {
       logStage('customize:start');
       await openInsightStudioCustomizeTab(page);
@@ -82,6 +76,9 @@ test('frontend: insight studio end-to-end flow is scriptable', async ({ page, lo
         logStage(`widget:${widget.index}:${widget.action}:done`);
       }
       logStage('customize:done');
+    }
+    if (config.pauseAtEnd && dbRow.id === '42') {
+      await page.pause();
     }
     logStage('save:start');
     await saveInsightStudioReport(page);

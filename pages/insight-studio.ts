@@ -82,16 +82,141 @@ function addRecipientButton(page: Page) {
     .first();
 }
 
+function insightStudioDataSourceCard(page: Page, index: number) {
+  return page.locator('app-report-builder-create-edit-datasource').nth(index);
+}
+
+function insightStudioSelectDataButton(page: Page, index: number) {
+  return page
+    .locator(
+      [
+        `#report-builder-create-edit-select-data-${index}`,
+        `#report-builder-create-edit-select-config-${index}`,
+        `button[data-test-id="report-builder-create-edit-select-data-${index}"]`,
+        'app-report-builder-create-edit-datasource button:has-text("Select Data")',
+        'app-report-builder-create-edit-datasource button:has-text("Select Config")'
+      ].join(', ')
+    )
+    .nth(index);
+}
+
+function insightStudioLineItemSearchInput(page: Page) {
+  return page
+    .locator(
+      'app-report-builder-data-selection-modal input#cpm-value:visible, app-report-builder-data-selection-modal input[placeholder="search"]:visible'
+    )
+    .first();
+}
+
+function insightStudioDataSelectionContinueButton(page: Page) {
+  return page
+    .locator(
+      'app-report-builder-data-selection-modal button[data-test-id="data-selection-continue-btn"]:visible, app-report-builder-data-selection-modal button:has-text("Continue"):visible'
+    )
+    .first();
+}
+
+async function selectMatchingOption(select: ReturnType<Page['locator']>, requestedLabel: string): Promise<void> {
+  const options = await select.locator('option').evaluateAll((nodes) =>
+    nodes.map((node) => ({
+      value: (node as HTMLOptionElement).value || '',
+      label: ((node.textContent || '')).trim(),
+      disabled: (node as HTMLOptionElement).disabled
+    }))
+  );
+
+  const normalizedRequested = requestedLabel.trim().toLowerCase();
+  const usable = options.find((option) => {
+    if (option.disabled) {
+      return false;
+    }
+    const label = option.label.toLowerCase();
+    return Boolean(option.value) && (label === normalizedRequested || label.includes(normalizedRequested));
+  });
+
+  if (!usable) {
+    throw new Error(`No dropdown option matched "${requestedLabel}".`);
+  }
+
+  await select.selectOption({ value: usable.value });
+}
+
+async function configureSiteAnalyticsV2DataSource(page: Page, index: number): Promise<void> {
+  const insightRow = loadInsightStudioCaseData();
+  if (!insightRow?.advertiser) {
+    if (config.pauseAtEnd && insightRow?.id === '29') {
+      await page.pause();
+    }
+    throw new Error('Site Analytics V2 datasource requires an advertiser value from insight_studio_suite.advertiser.');
+  }
+
+  const advertiserDropdown = katalonLocator(
+    page,
+    'Object Repository/Frontend/Insight Studio/Data Sources/Site Analytics V2/Advertiser Dropdown',
+    { index: String(index) }
+  );
+  await expect(advertiserDropdown).toBeVisible({ timeout: 15000 });
+  await selectMatchingOption(advertiserDropdown, insightRow.advertiser);
+
+  const configureFiltersButton = katalonLocator(
+    page,
+    'Object Repository/Frontend/Insight Studio/Data Sources/Site Analytics V2/Configure Filters Button',
+    { index: String(index) }
+  );
+  await expect(configureFiltersButton).toBeVisible({ timeout: 15000 });
+  await configureFiltersButton.click({ force: true });
+
+  const matchValueInput = katalonLocator(
+    page,
+    'Object Repository/Frontend/Insight Studio/Data Sources/Site Analytics V2/Match Value Input'
+  );
+  await expect(matchValueInput).toBeVisible({ timeout: 15000 });
+  await matchValueInput.fill('/');
+
+  const addFilterButton = katalonLocator(
+    page,
+    'Object Repository/Frontend/Insight Studio/Data Sources/Site Analytics V2/Add Filter Button'
+  );
+  await expect(addFilterButton).toBeVisible({ timeout: 15000 });
+  await addFilterButton.click({ force: true });
+
+  const continueButton = insightStudioDataSelectionContinueButton(page);
+  await expect(continueButton).toBeVisible({ timeout: 15000 });
+  await continueButton.click({ force: true });
+}
+
+function exportTargetTypeDropdown(page: Page, index: number) {
+  return page
+    .locator(
+      [
+        `#report-builder-create-edit-export-select-${index}`,
+        'select[id*="report-builder-create-edit-export-select"]',
+        'select[data-test-id*="export-target"]',
+        'select[aria-label*="Export Target"]'
+      ].join(', ')
+    )
+    .nth(index);
+}
+
+async function clickAddExportTargetButton(page: Page): Promise<void> {
+  const katalonButton = katalonLocator(page, 'Object Repository/Frontend/Insight Studio/Export Targets/Add Export Target Button');
+  const fallbackButton = page
+    .locator('button:has-text("New Target"), [role="button"]:has-text("New Target"), div:has-text("New Target")')
+    .filter({ hasText: 'New Target' })
+    .first();
+
+  const visibleButton = await katalonButton.isVisible().catch(() => false) ? katalonButton : fallbackButton;
+  await expect(visibleButton).toBeVisible({ timeout: 15000 });
+  await visibleButton.scrollIntoViewIfNeeded().catch(() => undefined);
+  await visibleButton.click({ force: true });
+}
+
 async function isWidgetEditorVisible(page: Page): Promise<boolean> {
   const checks = [
     widgetEditorPanel(page),
     widgetDataSourceDropdown(page),
     widgetTypeDropdown(page),
-    widgetApplyButton(page),
-    page.getByText('Dimension', { exact: true }).first(),
-    page.getByText('Metrics', { exact: true }).first(),
-    page.getByText('Data Source', { exact: true }).first(),
-    page.getByText('Widget Type', { exact: true }).first()
+    widgetApplyButton(page)
   ];
 
   for (const locator of checks) {
@@ -204,15 +329,9 @@ async function verifyInsightStudioLineItemAttached(
   options: InsightStudioDataSourceOptions,
   lineItem: string
 ): Promise<void> {
-  const noSelectionText = page.getByText(/No Line Items Selected/i).first();
-  const lineItemAttachedText = page.getByText(new RegExp(lineItem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))).first();
-  const dataSourceCard = katalonLocator(
-    page,
-    'Object Repository/Frontend/Insight Studio/Data Sources/Data Source Select Data Button',
-    {
-      index: String(options.index)
-    }
-  ).locator('xpath=ancestor::div[contains(@class,"parent-source")] | ancestor::div[contains(@class,"source")]').first();
+  const noSelectionText = page.getByText(/No (Line Items|Configs) Selected/i).first();
+  const dataSourceCard = insightStudioDataSourceCard(page, options.index);
+  const lineItemAttachedText = dataSourceCard.getByText(new RegExp(lineItem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))).first();
 
   await expect
     .poll(
@@ -228,7 +347,7 @@ async function verifyInsightStudioLineItemAttached(
           if (text.includes(lineItem)) {
             return 'attached';
           }
-          if (/No Line Items Selected/i.test(text)) {
+          if (/No (Line Items|Configs) Selected/i.test(text)) {
             return 'missing';
           }
         }
@@ -239,7 +358,7 @@ async function verifyInsightStudioLineItemAttached(
     .not.toBe('waiting');
 
   const cardText = ((await dataSourceCard.textContent().catch(() => '')) || '').trim();
-  if (!(cardText.includes(lineItem)) && /No Line Items Selected/i.test(cardText)) {
+  if (!(cardText.includes(lineItem)) && /No (Line Items|Configs) Selected/i.test(cardText)) {
     throw new Error(`Insight Studio line item "${lineItem}" was not attached to the datasource card after selection.`);
   }
 }
@@ -465,7 +584,12 @@ async function configureInsightStudioCadence(page: Page, cadence: string): Promi
 }
 
 export async function saveInsightStudioReport(page: Page): Promise<void> {
-  await katalonLocator(page, 'Object Repository/Frontend/Insight Studio/Save Report Button').click();
+  const katalonSaveButton = katalonLocator(page, 'Object Repository/Frontend/Insight Studio/Save Report Button');
+  const fallbackSaveButton = page.getByRole('button', { name: /save report/i }).first();
+  const saveButton = await katalonSaveButton.isVisible().catch(() => false) ? katalonSaveButton : fallbackSaveButton;
+
+  await expect(saveButton).toBeVisible({ timeout: 15000 });
+  await saveButton.click({ force: true });
   const confirmImmediate = katalonLocator(page, 'Object Repository/Frontend/Insight Studio/Confirm Immediate Report Btn');
   if (await confirmImmediate.isVisible().catch(() => false)) {
     await confirmImmediate.click();
@@ -477,25 +601,25 @@ export async function modifyInsightStudioWidget(page: Page, options: InsightStud
 
   const editorAlreadyVisible = await isWidgetEditorVisible(page);
 
-  if (options.action === 'add' && !editorAlreadyVisible) {
-    const addNewWidgetButton = visibleAddWidgetButton(page);
-    await expect(addNewWidgetButton).toBeVisible({ timeout: 15000 });
-    await addNewWidgetButton.scrollIntoViewIfNeeded();
-    await addNewWidgetButton.click({ force: true });
+  if (options.action === 'add') {
+    if (!editorAlreadyVisible) {
+      const addNewWidgetButton = visibleAddWidgetButton(page);
+      await expect(addNewWidgetButton).toBeVisible({ timeout: 15000 });
+      await addNewWidgetButton.scrollIntoViewIfNeeded();
+      await addNewWidgetButton.click({ force: true });
+    }
   } else if (options.action === 'edit') {
     await katalonLocator(page, 'Object Repository/Frontend/Insight Studio/Widgets/Edit Widget Icon', {
       index: (options.widgetIndex ?? 1) - 1
     }).click();
-  } else {
+  } else if (options.action === 'delete') {
     await katalonLocator(page, 'Object Repository/Frontend/Insight Studio/Widgets/Delete Widget Icon', {
       index: (options.widgetIndex ?? 1) - 1
     }).click();
     await katalonLocator(page, 'Object Repository/Frontend/Generic/Generic Modal').click();
     return;
-  }
-
-  if (config.pauseAtEnd && insightRow?.id === '9') {
-    await page.pause();
+  } else {
+    throw new Error(`Unsupported Insight Studio widget action: ${String(options.action)}`);
   }
 
   await waitForWidgetEditor(page, 20000);
@@ -553,12 +677,20 @@ export async function configureInsightStudioExportTargets(
       continue;
     }
 
-    await katalonLocator(page, 'Object Repository/Frontend/Insight Studio/Export Targets/Add Export Target Button').click();
+    await clickAddExportTargetButton(page);
 
     if (option.targetType) {
-      await katalonLocator(page, 'Object Repository/Frontend/Insight Studio/Export Targets/Export Target Type Dropdown', {
-        index: String(option.index)
-      }).selectOption({ label: option.targetType });
+      const katalonDropdown = katalonLocator(
+        page,
+        'Object Repository/Frontend/Insight Studio/Export Targets/Export Target Type Dropdown',
+        { index: String(option.index) }
+      );
+      const dropdown = await katalonDropdown.isVisible().catch(() => false)
+        ? katalonDropdown
+        : exportTargetTypeDropdown(page, option.index);
+
+      await expect(dropdown).toBeVisible({ timeout: 15000 });
+      await dropdown.selectOption({ label: option.targetType });
     }
   }
 }
@@ -607,26 +739,28 @@ export async function configureInsightStudioDataSource(
     }).selectOption({ label: options.dateRange });
   }
 
+  if ((options.dataSourceType || '').toLowerCase() === 'site analytics v2') {
+    await configureSiteAnalyticsV2DataSource(page, options.index);
+    return;
+  }
+
   if ((options.dataSelectionType || '').toLowerCase() === 'line item selection') {
-    await katalonLocator(page, 'Object Repository/Frontend/Insight Studio/Data Sources/Data Source Select Data Button', {
-      index: String(options.index)
-    }).click();
+    const selectDataButton = insightStudioSelectDataButton(page, options.index);
+    await expect(selectDataButton).toBeVisible({ timeout: 15000 });
+    await selectDataButton.click({ force: true });
 
     await clearSelectedInsightStudioLineItems(page);
 
-    const lineItemSearch = katalonLocator(page, 'Object Repository/Frontend/Insight Studio/Data Sources/Data Selection Line Item Search Input');
+    const lineItemSearch = insightStudioLineItemSearchInput(page);
+    await expect(lineItemSearch).toBeVisible({ timeout: 15000 });
     for (const lineItem of options.lineItems) {
       await lineItemSearch.fill(lineItem);
-      if (config.pauseAtEnd && insightRow?.id === '9') {
-        await page.pause();
-      }
       await selectInsightStudioLineItem(page, lineItem);
     }
 
-    await katalonLocator(
-      page,
-      'Object Repository/Frontend/Insight Studio/Data Sources/Site Analytics V2/Data Selection Continue Button'
-    ).click();
+    const continueButton = insightStudioDataSelectionContinueButton(page);
+    await expect(continueButton).toBeVisible({ timeout: 15000 });
+    await continueButton.click({ force: true });
 
     for (const lineItem of options.lineItems) {
       await verifyInsightStudioLineItemAttached(page, options, lineItem);
