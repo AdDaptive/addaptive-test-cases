@@ -7,6 +7,8 @@ export type BackendDealStageOptions = {
   dealStatus?: string;
   source?: string;
   viewabilityPartner?: string;
+  b2bAnalyticsCadence?: string[];
+  accountNotes?: string;
   canTargetOutsideAbmList?: boolean;
 };
 
@@ -19,6 +21,46 @@ async function clickWithOptionalDialog(page: Page, clicker: () => Promise<void>)
   };
 
   await Promise.all([clicker(), handler()]);
+}
+
+function normalizeOptionText(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+async function selectOptionFlex(
+  locator: ReturnType<typeof katalonLocator>,
+  desiredValue: string,
+  preferredMode: 'label' | 'value' = 'label'
+): Promise<void> {
+  const normalizedDesired = normalizeOptionText(desiredValue);
+  const options = await locator.locator('option').evaluateAll((nodes) =>
+    nodes.map((node) => ({
+      value: (node as HTMLOptionElement).value,
+      label: (node as HTMLOptionElement).label || node.textContent || ''
+    }))
+  );
+
+  const directMatch = options.find(
+    (option) =>
+      normalizeOptionText(option.label) === normalizedDesired || normalizeOptionText(option.value) === normalizedDesired
+  );
+  const containsMatch = options.find(
+    (option) =>
+      normalizeOptionText(option.label).includes(normalizedDesired) ||
+      normalizedDesired.includes(normalizeOptionText(option.label))
+  );
+  const match = directMatch || containsMatch;
+
+  if (!match) {
+    throw new Error(`Unable to find option "${desiredValue}" in select control.`);
+  }
+
+  if (preferredMode === 'value' && match.value) {
+    await locator.selectOption({ value: match.value });
+    return;
+  }
+
+  await locator.selectOption({ label: match.label });
 }
 
 function resolveBackendRoute(page: Page, fallbackPath: string): string {
@@ -99,26 +141,60 @@ export async function openBackendDealSpotlight(page: Page, dealId?: string): Pro
 
 export async function configureBackendDealStage(page: Page, options: BackendDealStageOptions): Promise<void> {
   if (options.dealStage) {
-    await katalonLocator(page, 'Object Repository/Backend/Sales Dashboard/Spotlight Page/Complete-Deal/select_CompleteDeal_DealStage').selectOption({
-      label: options.dealStage
-    });
+    await selectOptionFlex(
+      katalonLocator(page, 'Object Repository/Backend/Sales Dashboard/Spotlight Page/Complete-Deal/select_CompleteDeal_DealStage'),
+      options.dealStage
+    );
   }
   if (options.dealStatus) {
-    await katalonLocator(
-      page,
-      'Object Repository/Backend/Sales Dashboard/Spotlight Page/Close-Deal-Stages/select_Deal_Stage_Deal_Status'
-    ).selectOption({ label: options.dealStatus });
+    await selectOptionFlex(
+      katalonLocator(
+        page,
+        'Object Repository/Backend/Sales Dashboard/Spotlight Page/Close-Deal-Stages/select_Deal_Stage_Deal_Status'
+      ),
+      options.dealStatus
+    );
   }
   if (options.source) {
-    await katalonLocator(page, 'Object Repository/Backend/Sales Dashboard/Spotlight Page/Complete-Deal/select_CompleteDeal_Source').selectOption({
-      label: options.source
-    });
+    await selectOptionFlex(
+      katalonLocator(page, 'Object Repository/Backend/Sales Dashboard/Spotlight Page/Complete-Deal/select_CompleteDeal_Source'),
+      options.source
+    );
   }
   if (options.viewabilityPartner) {
-    await katalonLocator(
+    await selectOptionFlex(
+      katalonLocator(
+        page,
+        'Object Repository/Backend/Sales Dashboard/Spotlight Page/Complete-Deal/select_CompleteDeal_ViewabilityPartner'
+      ),
+      options.viewabilityPartner
+    );
+  }
+
+  if (options.b2bAnalyticsCadence && options.b2bAnalyticsCadence.length > 0) {
+    const cadenceSelect = katalonLocator(
       page,
-      'Object Repository/Backend/Sales Dashboard/Spotlight Page/Complete-Deal/select_CompleteDeal_ViewabilityPartner'
-    ).selectOption({ label: options.viewabilityPartner });
+      'Object Repository/Backend/Sales Dashboard/Spotlight Page/Complete-Deal/select_CompleteDeal_B2BAnalyticsReportingCadence'
+    );
+    const optionsList = await cadenceSelect.locator('option').evaluateAll((nodes) =>
+      nodes.map((node) => ({
+        value: (node as HTMLOptionElement).value,
+        label: (node as HTMLOptionElement).label || node.textContent || ''
+      }))
+    );
+    const resolved = options.b2bAnalyticsCadence
+      .map((item) => {
+        const normalizedDesired = normalizeOptionText(item);
+        return (
+          optionsList.find((option) => normalizeOptionText(option.label) === normalizedDesired)?.value ||
+          optionsList.find((option) => normalizeOptionText(option.value) === normalizedDesired)?.value
+        );
+      })
+      .filter((item): item is string => !!item);
+
+    if (resolved.length > 0) {
+      await cadenceSelect.selectOption(resolved.map((value) => ({ value })));
+    }
   }
 
   if (typeof options.canTargetOutsideAbmList === 'boolean') {
@@ -135,6 +211,39 @@ export async function configureBackendDealStage(page: Page, options: BackendDeal
       }
     }
   }
+
+  if (options.accountNotes) {
+    const notesBody = page.frameLocator('#notes-field_ifr').locator('body');
+    await notesBody.click();
+    await notesBody.fill(options.accountNotes);
+  }
+}
+
+export async function sendDealToProposalSentNegotiation(page: Page): Promise<void> {
+  await clickWithOptionalDialog(page, async () => {
+    await katalonLocator(
+      page,
+      'Object Repository/Backend/Sales Dashboard/Spotlight Page/Close-Deal-Stages/button_Deal_Stage_Send_To_Proposal_Sent-Negotiation'
+    ).click();
+  });
+}
+
+export async function sendDealToVerbalAgreement(page: Page): Promise<void> {
+  await clickWithOptionalDialog(page, async () => {
+    await katalonLocator(
+      page,
+      'Object Repository/Backend/Sales Dashboard/Spotlight Page/Close-Deal-Stages/button_Deal_Stage_Send_To_Verbal_Agreement'
+    ).click();
+  });
+}
+
+export async function sendDealToClosedWon(page: Page): Promise<void> {
+  await clickWithOptionalDialog(page, async () => {
+    await katalonLocator(
+      page,
+      'Object Repository/Backend/Sales Dashboard/Spotlight Page/Close-Deal-Stages/saveClosedWon_button'
+    ).click();
+  });
 }
 
 export async function sendDealToOperations(page: Page): Promise<void> {

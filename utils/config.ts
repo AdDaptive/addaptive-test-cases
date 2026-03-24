@@ -211,6 +211,18 @@ export const config = {
   get backendInFlightAction(): string | undefined {
     return optional('ADDAPTIVE_BACKEND_IN_FLIGHT_ACTION');
   },
+  get dealsDbObjectId(): string | undefined {
+    return optional('ADDAPTIVE_DEALS_DB_OBJECT_ID');
+  },
+  get dealsDbTestCaseName(): string | undefined {
+    return optional('ADDAPTIVE_DEALS_DB_TEST_CASE_NAME');
+  },
+  get dealsDbIds(): string[] {
+    return list('ADDAPTIVE_DEALS_DB_IDS');
+  },
+  get dealsDbRange(): string | undefined {
+    return optional('ADDAPTIVE_DEALS_DB_RANGE');
+  },
   get clientAction(): 'create' | 'update' {
     return read('ADDAPTIVE_CLIENT_ACTION') === 'create' ? 'create' : 'update';
   },
