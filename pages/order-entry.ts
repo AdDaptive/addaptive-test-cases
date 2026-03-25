@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Locator, Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 import { katalonLocator } from '../locators/resolve';
 import { env } from '../utils/env';
 import type { OrderEntryAudienceAction } from '../utils/order-entry-db';
@@ -2529,6 +2529,13 @@ export async function configureOrderEntryAudience(
       }).click();
     }
 
+    await page.keyboard.press('Escape').catch(() => undefined);
+    await page
+      .locator('.audience__filters [role="tooltip"]')
+      .first()
+      .waitFor({ state: 'hidden', timeout: 5000 })
+      .catch(() => undefined);
+
     if (hasValue(action.audienceName)) {
       const searchInput = katalonLocator(page, 'Object Repository/Frontend/Order-Entry/Audience-Tab/input_Audience_Search');
       await searchInput.fill('');
@@ -2575,11 +2582,20 @@ export async function configureOrderEntryAudience(
     });
 
     const dragSource = (await sourceAudience.isVisible().catch(() => false)) ? sourceAudience : fallbackSourceAudience;
-    await dragSource.dragTo(targetSubgroup).catch(async () => {
+    await expect(dragSource).toBeVisible();
+    await expect(targetSubgroup).toBeVisible();
+    await dragSource.scrollIntoViewIfNeeded().catch(() => undefined);
+    await targetSubgroup.scrollIntoViewIfNeeded().catch(() => undefined);
+
+    await dragSource.dragTo(targetSubgroup).catch(async (error) => {
+      if (page.isClosed()) {
+        throw error;
+      }
+
       const sourceBox = await dragSource.boundingBox();
       const targetBox = await targetSubgroup.boundingBox();
       if (!sourceBox || !targetBox) {
-        throw new Error(`Failed to drag audience "${action.audienceName || action.audienceId || ''}" into target subgroup.`);
+        throw error;
       }
 
       await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
