@@ -133,6 +133,18 @@ export const config = {
   get orderEntryCreativeDbObjectId(): string | undefined {
     return optional('ADDAPTIVE_ORDER_ENTRY_CREATIVE_DB_OBJECT_ID');
   },
+  get opsDashboardTable(): string | undefined {
+    return optional('ADDAPTIVE_OPS_DASHBOARD_TABLE');
+  },
+  get opsDashboardDbId(): string | undefined {
+    return optional('ADDAPTIVE_OPS_DASHBOARD_DB_ID');
+  },
+  get opsDashboardDbIds(): string[] {
+    return list('ADDAPTIVE_OPS_DASHBOARD_DB_IDS');
+  },
+  get opsDashboardDbRange(): string | undefined {
+    return optional('ADDAPTIVE_OPS_DASHBOARD_DB_RANGE');
+  },
   get pauseAtEnd(): boolean {
     return bool('ADDAPTIVE_PAUSE_AT_END');
   },
