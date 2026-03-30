@@ -8,10 +8,13 @@ export async function loginToFrontend(page: Page, username: string, password: st
   const loginDiagnostics = createFrontendLoginDiagnostics(page);
 
   await page.goto(baseUrl);
-  await usernameInput.waitFor({ state: 'visible' });
-  await usernameInput.fill(username);
-  await passwordInput.fill(password);
-  await loginButton.click();
+  const loginFormVisible = await usernameInput.waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
+
+  if (loginFormVisible) {
+    await usernameInput.fill(username);
+    await passwordInput.fill(password);
+    await loginButton.click();
+  }
 
   await waitForFrontendSessionReady(page, loginDiagnostics).finally(() => {
     loginDiagnostics.dispose();

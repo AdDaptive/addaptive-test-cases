@@ -130,6 +130,30 @@ export const config = {
   get orderEntryDbRange(): string | undefined {
     return optional('ADDAPTIVE_ORDER_ENTRY_DB_RANGE');
   },
+  get clientSettingsDbTable(): string | undefined {
+    return optional('ADDAPTIVE_CLIENT_SETTINGS_DB_TABLE');
+  },
+  get clientSettingsGroupTable(): string | undefined {
+    return optional('ADDAPTIVE_CLIENT_SETTINGS_GROUP_TABLE');
+  },
+  get clientSettingsStepTable(): string | undefined {
+    return optional('ADDAPTIVE_CLIENT_SETTINGS_STEP_TABLE');
+  },
+  get clientSettingsDbId(): string | undefined {
+    return optional('ADDAPTIVE_CLIENT_SETTINGS_DB_ID');
+  },
+  get clientSettingsDbTestCaseName(): string | undefined {
+    return optional('ADDAPTIVE_CLIENT_SETTINGS_DB_TEST_CASE_NAME');
+  },
+  get clientSettingsDbIds(): string[] {
+    return list('ADDAPTIVE_CLIENT_SETTINGS_DB_IDS');
+  },
+  get clientSettingsDbRange(): string | undefined {
+    return optional('ADDAPTIVE_CLIENT_SETTINGS_DB_RANGE');
+  },
+  get clientSettingsAdServer(): string | undefined {
+    return optional('ADDAPTIVE_CLIENT_SETTINGS_AD_SERVER');
+  },
   get orderEntryCreativeDbObjectId(): string | undefined {
     return optional('ADDAPTIVE_ORDER_ENTRY_CREATIVE_DB_OBJECT_ID');
   },

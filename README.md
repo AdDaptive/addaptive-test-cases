@@ -83,6 +83,62 @@ npm run test:oe:mm:create
 npm run test:oe:mm:edit
 ```
 
+## Client Settings MediaMath Defaults
+
+Standalone suite for validating that backend MediaMath client settings default correctly into a new frontend create-order flow.
+
+Spec:
+
+```bash
+tests/frontend/client-settings-mediamath-defaults.spec.ts
+```
+
+Run one suite row with the browser visible:
+
+```bash
+ADDAPTIVE_CLIENT_SETTINGS_DB_ID=1 npx playwright test tests/frontend/client-settings-mediamath-defaults.spec.ts --project=chromium --headed --reporter=line
+```
+
+The suite is separate from the normal Order Entry end-to-end specs. It does not use `order-entry-end-to-end.spec.ts` or `order-entry-end-to-end-batch.spec.ts`.
+
+Current DB model:
+
+1. Parent table: `client_settings_preflight_suite`
+2. Child step table: `client_settings_suite_group_steps`
+3. Child rows link back to the parent with `preflight_suite_id`
+
+The suite executes child steps in DB order. Supported `step_type` values:
+
+1. `frontend_context`
+2. `backend_set`
+3. `frontend_assert`
+
+Current step table fields:
+
+1. `preflight_suite_id`
+2. `step_type`
+3. `backend_field`
+4. `frontend_field`
+5. `value`
+
+Typical step flow:
+
+1. `frontend_context` step sets order context such as `creative_type`, `objectives_type`, or `objectives_goal`
+2. `backend_set` step applies a backend client setting
+3. `frontend_assert` step opens a fresh create order and verifies the inherited frontend default
+
+Current supported frontend assertions:
+
+1. `billing_cpm`
+2. `bid_cpm`
+3. `goal_value`
+
+Current supported backend field coverage includes MediaMath client-level fields such as:
+
+1. `Billing CPM > Banner`
+2. `Bid CPM > Banner`
+3. objective goal fields such as `awareness_reach_banner_goal_value`
+
 ## Audiences 1st-Party End-to-End
 
 Use the single spec when you want to run one audiences row. Use the batch spec when you want to generate many tests from DB-selected rows in `audiences_suite`.
