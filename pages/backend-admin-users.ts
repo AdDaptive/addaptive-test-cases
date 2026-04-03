@@ -21,6 +21,18 @@ export async function openBackendUsersPage(page: Page): Promise<void> {
   await katalonLocator(page, 'Object Repository/Backend/Sidebar Anchor', { sidebarItem: 'Users' }).click();
 }
 
+function stableUserGroupsSelect(page: Page) {
+  return page.locator('select[name$="[groups][]"]').first();
+}
+
+function stableUserFirstNameInput(page: Page) {
+  return page.locator('input[name$="[firstName]"]').first();
+}
+
+function stableUserLastNameInput(page: Page) {
+  return page.locator('input[name$="[lastName]"]').first();
+}
+
 export async function createOrUpdateBackendUser(page: Page, options: BackendUserUpsertOptions): Promise<void> {
   await openBackendUsersPage(page);
 
@@ -59,23 +71,30 @@ export async function createOrUpdateBackendUser(page: Page, options: BackendUser
     );
   }
   if (options.client) {
-    await katalonLocator(page, 'Object Repository/Backend/Backend Admin/Users/Create Update/Client Dropdown').selectOption({
+    const clientDropdown = katalonLocator(
+      page,
+      'Object Repository/Backend/Backend Admin/Users/Create Update/Client Dropdown'
+    );
+    await clientDropdown.waitFor({ state: 'visible', timeout: 15000 });
+    await clientDropdown.selectOption({
       label: options.client
     });
   }
   if (options.firstName) {
-    await katalonLocator(page, 'Object Repository/Backend/Backend Admin/Users/Create Update/First Name Input').fill(
-      options.firstName
-    );
+    const firstNameInput = stableUserFirstNameInput(page);
+    await firstNameInput.waitFor({ state: 'visible', timeout: 15000 });
+    await firstNameInput.fill(options.firstName);
   }
   if (options.lastName) {
-    await katalonLocator(page, 'Object Repository/Backend/Backend Admin/Users/Create Update/Last Name Input').fill(
-      options.lastName
-    );
+    const lastNameInput = stableUserLastNameInput(page);
+    await lastNameInput.waitFor({ state: 'visible', timeout: 15000 });
+    await lastNameInput.fill(options.lastName);
   }
 
   for (const group of options.groups || []) {
-    await katalonLocator(page, 'Object Repository/Backend/Backend Admin/Users/Create Update/Groups Dropdown').selectOption({
+    const groupsDropdown = stableUserGroupsSelect(page);
+    await groupsDropdown.waitFor({ state: 'visible', timeout: 15000 });
+    await groupsDropdown.selectOption({
       label: group
     });
   }
@@ -99,6 +118,12 @@ export async function createOrUpdateBackendUser(page: Page, options: BackendUser
 
   if (options.action === 'create') {
     await katalonLocator(page, 'Object Repository/Backend/Backend Admin/Common/Create and Return to List Button').click();
+    if (options.email) {
+      await page
+        .locator('.alert.alert-success')
+        .filter({ hasText: `Item "${options.email}" has been successfully created.` })
+        .waitFor({ state: 'visible', timeout: 15000 });
+    }
   } else {
     await katalonLocator(page, 'Object Repository/Backend/Backend Admin/Common/Update and Close Button').click();
   }

@@ -26,10 +26,50 @@ async function waitForClientEditor(page: Page): Promise<void> {
   }).waitFor({ state: 'visible', timeout: 15000 });
 }
 
+async function openPlatformSettings(page: Page): Promise<void> {
+  const header = katalonLocator(page, 'Object Repository/Backend/Backend Admin/Clients/Client Tabs/Client Settings Headers', {
+    clientHeader: 'Platform Settings'
+  });
+  const clientNameInput = katalonLocator(
+    page,
+    'Object Repository/Backend/Backend Admin/Clients/Client Tabs/A360 Settings Tab/Client Name Input'
+  );
+
+  if (await clientNameInput.isVisible().catch(() => false)) {
+    return;
+  }
+
+  await Promise.any([
+    clientNameInput.waitFor({ state: 'visible', timeout: 15000 }),
+    header.waitFor({ state: 'visible', timeout: 15000 })
+  ]).catch(() => undefined);
+
+  if (await clientNameInput.isVisible().catch(() => false)) {
+    return;
+  }
+
+  await header.waitFor({ state: 'visible', timeout: 15000 });
+  await header.click();
+  await clientNameInput.waitFor({ state: 'visible', timeout: 15000 });
+}
+
 async function openClientA360Settings(page: Page): Promise<void> {
-  await katalonLocator(page, 'Object Repository/Backend/Backend Admin/Clients/Client Tabs/Client Settings Headers', {
+  const header = katalonLocator(page, 'Object Repository/Backend/Backend Admin/Clients/Client Tabs/Client Settings Headers', {
     clientHeader: 'A360 Settings'
-  }).click();
+  });
+  const clientNameInput = katalonLocator(
+    page,
+    'Object Repository/Backend/Backend Admin/Clients/Client Tabs/A360 Settings Tab/Client Name Input'
+  );
+
+  if (await clientNameInput.isVisible().catch(() => false)) {
+    return;
+  }
+
+  if (await header.isVisible().catch(() => false)) {
+    await header.click();
+  }
+  await clientNameInput.waitFor({ state: 'visible', timeout: 15000 });
 }
 
 async function openMediaMathClientSettings(page: Page): Promise<void> {
@@ -120,6 +160,15 @@ async function selectByIdSuffix(page: Page, suffix: string, value?: string): Pro
     element.dispatchEvent(new Event('input', { bubbles: true }));
     element.dispatchEvent(new Event('change', { bubbles: true }));
   }, optionValue);
+}
+
+async function selectAllOptions(locator: ReturnType<Page['locator']>): Promise<void> {
+  const values = await locator.locator('option').evaluateAll((options) =>
+    options
+      .map((option) => (option instanceof HTMLOptionElement ? option.value : ''))
+      .filter((value) => value && value.trim().length > 0)
+  );
+  await locator.selectOption(values);
 }
 
 async function readByIdSuffix(page: Page, suffix: string): Promise<string> {
@@ -346,6 +395,7 @@ export async function createOrUpdateBackendClient(page: Page, options: BackendCl
     }).click();
   }
 
+  await openPlatformSettings(page);
   await openClientA360Settings(page);
 
   if (options.isActive) {
@@ -355,10 +405,13 @@ export async function createOrUpdateBackendClient(page: Page, options: BackendCl
     ).selectOption({ label: options.isActive });
   }
   if (options.clientName) {
-    await katalonLocator(
+    const clientNameInput = katalonLocator(
       page,
       'Object Repository/Backend/Backend Admin/Clients/Client Tabs/A360 Settings Tab/Client Name Input'
-    ).fill(options.clientName);
+    );
+    await clientNameInput.waitFor({ state: 'visible', timeout: 15000 });
+    await clientNameInput.fill(options.clientName);
+    await clientNameInput.waitFor({ state: 'visible', timeout: 15000 });
   }
   if (options.tier) {
     await katalonLocator(
@@ -367,10 +420,13 @@ export async function createOrUpdateBackendClient(page: Page, options: BackendCl
     ).selectOption({ label: options.tier });
   }
   if (options.salesforceAccountId) {
-    await katalonLocator(
+    const salesforceInput = katalonLocator(
       page,
       'Object Repository/Backend/Backend Admin/Clients/Client Tabs/A360 Settings Tab/Salesforce Account ID Input'
-    ).fill(options.salesforceAccountId);
+    );
+    await salesforceInput.waitFor({ state: 'visible', timeout: 15000 });
+    await salesforceInput.fill(options.salesforceAccountId);
+    await salesforceInput.waitFor({ state: 'visible', timeout: 15000 });
   }
   if (options.type) {
     await katalonLocator(page, 'Object Repository/Backend/Backend Admin/Clients/Client Tabs/A360 Settings Tab/Type Dropdown').selectOption({
@@ -393,10 +449,16 @@ export async function createOrUpdateBackendClient(page: Page, options: BackendCl
     );
   }
   for (const adServer of options.adServers || []) {
-    await katalonLocator(
+    const adServerMultiselect = katalonLocator(
       page,
       'Object Repository/Backend/Backend Admin/Clients/Client Tabs/A360 Settings Tab/Ad Server Multiselect'
-    ).selectOption({ label: adServer });
+    );
+    await adServerMultiselect.waitFor({ state: 'visible', timeout: 15000 });
+    if (adServer === '*') {
+      await selectAllOptions(adServerMultiselect);
+      break;
+    }
+    await adServerMultiselect.selectOption({ label: adServer });
   }
 
   await openClientA360Settings(page);
@@ -417,6 +479,21 @@ export async function createOrUpdateBackendClient(page: Page, options: BackendCl
   }
 
   if (options.action === 'create') {
+    const createAndEditButton = page.getByRole('button', { name: /Create and edit/i }).first();
+    const createAndContinueEditingButton = page.getByRole('button', { name: /Create and continue editing/i }).first();
+
+    if (await createAndEditButton.isVisible().catch(() => false)) {
+      await createAndEditButton.click();
+      await waitForClientEditor(page);
+      return;
+    }
+
+    if (await createAndContinueEditingButton.isVisible().catch(() => false)) {
+      await createAndContinueEditingButton.click();
+      await waitForClientEditor(page);
+      return;
+    }
+
     await katalonLocator(page, 'Object Repository/Backend/Backend Admin/Common/Create and Return to List Button').click();
   } else {
     await katalonLocator(page, 'Object Repository/Backend/Backend Admin/Common/Update and Close Button').click();

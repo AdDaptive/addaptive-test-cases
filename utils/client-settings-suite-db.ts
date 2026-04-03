@@ -39,9 +39,15 @@ const DEFAULT_STEP_TABLE = 'client_settings_suite_group_steps';
 
 function normalizeStepFieldName(stepType: string, fieldName: string): string {
   const normalizedStepType = stepType.trim().toLowerCase();
+  const trimmedFieldName = fieldName.trim();
+  if (
+    /^(css=|xpath=|\/\/|#|\.|\[|input\b|select\b|button\b|span\b|div\b)/i.test(trimmedFieldName)
+  ) {
+    return trimmedFieldName;
+  }
   const normalizedField = fieldName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 
-  if (normalizedStepType === 'backend_set') {
+  if (normalizedStepType === 'backend_set' || normalizedStepType === 'backend_assert') {
     if (normalizedField === 'billing_cpm_banner') {
       return 'billing_cpm_banner';
     }
@@ -132,6 +138,17 @@ function tableExists(tableName: string): boolean {
   return result[0]?.exists === true;
 }
 
+function getTableColumns(tableName: string): Set<string> {
+  const rows = queryJson<Array<{ columnName: string }>>(`
+    select column_name as "columnName"
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = ${sqlLiteral(tableName)}
+  `);
+
+  return new Set(rows.map((row) => row.columnName));
+}
+
 export function getSelectedClientSettingsObjectIdsFromEnv(): string[] {
   const explicitIds = config.clientSettingsDbIds;
   if (explicitIds.length > 0) {
@@ -173,9 +190,17 @@ export function loadClientSettingsSuiteGroups(filters: {
   const ids = [...new Set(getSelectedClientSettingsObjectIdsFromEnv().map((item) => item.trim()).filter(Boolean))];
   const selectedRange = parseRange(config.clientSettingsDbRange);
   const selectedAdServer = sanitizeValue(config.clientSettingsAdServer);
+  const groupTableColumns = getTableColumns(resolveGroupTableName());
   const groupTableName = sqlIdentifier(resolveGroupTableName());
   const stepTableName = sqlIdentifier(resolveStepTableName());
   const whereClauses: string[] = [];
+  const impersonateUserProfileSelect = groupTableColumns.has('impersonate_user_profile')
+    ? 'g.impersonate_user_profile'
+    : 'null::text';
+  const clientNameSelect = groupTableColumns.has('client_name') ? 'g.client_name' : 'null::text';
+  const statusSelect = groupTableColumns.has('status') ? 'g.status' : 'null::text';
+  const adServerSelect = groupTableColumns.has('ad_server') ? 'g.ad_server' : `'MEDIAMATH'`;
+  const orderActionSelect = groupTableColumns.has('order_action') ? 'g.order_action' : `'create'`;
 
   if (ids.length > 0) {
     whereClauses.push(`g.object_id in (${ids.map((id) => sqlLiteral(id)).join(', ')})`);
@@ -225,28 +250,28 @@ export function loadClientSettingsSuiteGroups(filters: {
       selected."fieldValue"
     from (
       select
-        g.id::text as "groupId",
+        g.object_id::text as "groupId",
         g.object_id::text as "objectId",
         g.test_case_name as "testCaseName",
-        g.status as "status",
-        g.impersonate_user_profile as "impersonateUserProfile",
-        g.client_name as "clientName",
-        g.client_name as "backendClientName",
+        ${statusSelect} as "status",
+        ${impersonateUserProfileSelect} as "impersonateUserProfile",
+        ${clientNameSelect} as "clientName",
+        ${clientNameSelect} as "backendClientName",
         null::text as "advertiser",
-        'MEDIAMATH' as "adServer",
-        'create' as "orderAction",
+        ${adServerSelect} as "adServer",
+        ${orderActionSelect} as "orderAction",
         'mediamath-defaults' as "expectedProfile",
         s.id::text as "stepId",
-        s.id as "sortOrder",
+        coalesce(s.step_order, s.id) as "sortOrder",
         s.step_type as "stepType",
         case
-          when lower(coalesce(s.step_type, '')) = 'backend_set' then s.backend_field
+          when lower(coalesce(s.step_type, '')) in ('backend_set', 'backend_assert') then s.backend_field
           else s.frontend_field
         end as "fieldName",
         s.value as "fieldValue",
         dense_rank() over (order by g.object_id::int nulls last, g.id) as "rowNumber"
       from ${groupTableName} g
-      join ${stepTableName} s on s.preflight_suite_id = g.id::text
+      join ${stepTableName} s on s.object_id = g.object_id
       ${whereClause}
     ) selected
     ${rangeClause}
@@ -308,7 +333,7 @@ function formatLoadError(error: unknown): string {
   }
 
   if (/column .* does not exist/i.test(message)) {
-    return `Client-settings suite tables are missing required columns. Expected current group columns include id, object_id, test_case_name, impersonate_user_profile, and client_name. Expected current step columns include id, frontend_field, backend_field, preflight_suite_id, step_type, and value.`;
+    return `Client-settings suite tables are missing required columns. Expected current group columns include id, object_id, test_case_name, impersonate_user_profile, and client_name. Expected current step columns include id, object_id, frontend_field, backend_field, step_type, value, and optionally step_order.`;
   }
 
   return message;

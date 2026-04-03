@@ -120,7 +120,7 @@ export async function impersonateFrontendUser(page: Page, email: string): Promis
 
   const impersonateInput = katalonLocator(page, 'Object Repository/Frontend/Impersonate-User/input_ImpersonateUserEmail');
   await impersonateInput.fill('');
-  await impersonateInput.pressSequentially(email, { delay: 50 });
+  await impersonateInput.fill(email);
 
   const exactOption = page
     .locator('ngb-typeahead-window button')
