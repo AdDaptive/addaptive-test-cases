@@ -21,6 +21,7 @@ import {
   verifySplitGroupCount
 } from '../../pages/order-entry';
 import {
+  loadOrderEntryCaseData,
   loadOrderEntryCreativeRowsForCase,
   requireOrderEntryBasicSetupValues,
   requireOrderEntryAudienceActions,
@@ -32,6 +33,13 @@ import {
   requireOrderEntrySplitValues
 } from '../../utils/order-entry-db';
 import { config } from '../../utils/config';
+import {
+  clearValidationQueueFile,
+  queueCurrentOrderEntryValidations,
+  runQueuedOrderEntryValidations,
+  shouldGenerateOrderEntryValidations,
+  shouldRunOrderEntryValidations
+} from '../../utils/order-entry-validation';
 
 function shouldPauseAtEnd(): boolean {
   return config.pauseAtEnd;
@@ -43,7 +51,7 @@ test.afterEach(async ({ page }, testInfo) => {
   }
 });
 
-test('frontend: order entry end-to-end flow is scriptable', async ({ page, loginAsDefaultUser, impersonateConfiguredUser }) => {
+test('frontend: order entry end-to-end flow is scriptable', async ({ page, request, loginAsDefaultUser, impersonateConfiguredUser }) => {
   test.setTimeout(90000);
   const basicSetupValues = requireOrderEntryBasicSetupValues();
   const audienceActions = requireOrderEntryAudienceActions();
@@ -54,8 +62,14 @@ test('frontend: order entry end-to-end flow is scriptable', async ({ page, login
   const splitActions = loadOrderEntrySplitActions();
   const flowValues = requireOrderEntryFlowValues();
   const objectivesValues = requireOrderEntryObjectivesValues();
+  const currentCase = loadOrderEntryCaseData();
   const displayTabs = new Set(flowValues.tabs.map((item) => item.toLowerCase()));
   const orderAction = (objectivesValues.orderAction || budgetFlightValues.orderAction || config.orderEntryAction || 'create').toLowerCase();
+  const generateValidations = shouldGenerateOrderEntryValidations(basicSetupValues.adServer);
+
+  if (generateValidations) {
+    await clearValidationQueueFile();
+  }
 
   await loginAsDefaultUser();
 
@@ -229,6 +243,16 @@ test('frontend: order entry end-to-end flow is scriptable', async ({ page, login
       splitsAllocations: flowValues.splitsAllocationList,
       confirmationMessages: flowValues.confirmationMessages
     });
+    if (generateValidations && currentCase) {
+      await queueCurrentOrderEntryValidations(page, {
+        testCaseName: currentCase.test_case_name,
+        adServer: basicSetupValues.adServer,
+        lineItemName: basicSetupValues.lineItemName
+      });
+      if (shouldRunOrderEntryValidations()) {
+        await runQueuedOrderEntryValidations(request);
+      }
+    }
   } else if (orderSubmitType === 'invalid-order') {
     await verifySubmitOrderDisabled(page);
   } else if (config.orderEntrySaveDraft) {

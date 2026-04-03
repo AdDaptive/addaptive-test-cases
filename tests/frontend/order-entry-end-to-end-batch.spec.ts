@@ -22,6 +22,7 @@ import {
 } from '../../pages/order-entry';
 import {
   buildOrderEntryCaseSelectionError,
+  loadOrderEntryCaseData,
   loadOrderEntryCreativeRowsForCase,
   loadOrderEntryCaseSummaries,
   requireOrderEntryBasicSetupValues,
@@ -34,8 +35,17 @@ import {
   requireOrderEntrySplitValues
 } from '../../utils/order-entry-db';
 import { config } from '../../utils/config';
+import {
+  clearValidationQueueFile,
+  queueCurrentOrderEntryValidations,
+  runQueuedOrderEntryValidations,
+  shouldGenerateOrderEntryValidations,
+  shouldRunOrderEntryValidations
+} from '../../utils/order-entry-validation';
 
-test.describe.configure({ mode: 'parallel' });
+const selectedCases = loadOrderEntryCaseSummaries();
+const batchValidationEnabled = selectedCases.some((selectedCase) => shouldGenerateOrderEntryValidations(selectedCase.adServer));
+test.describe.configure({ mode: batchValidationEnabled ? 'serial' : 'parallel' });
 
 function shouldPauseAtEnd(): boolean {
   return config.pauseAtEnd;
@@ -49,6 +59,7 @@ test.afterEach(async ({ page }, testInfo) => {
 
 async function runOrderEntryEndToEnd(
   page: Parameters<typeof openOrderEntryPage>[0],
+  request: Parameters<typeof runQueuedOrderEntryValidations>[0],
   loginAsDefaultUser: () => Promise<void>,
   impersonateConfiguredUser: () => Promise<void>
 ): Promise<void> {
@@ -61,8 +72,10 @@ async function runOrderEntryEndToEnd(
   const splitActions = loadOrderEntrySplitActions();
   const flowValues = requireOrderEntryFlowValues();
   const objectivesValues = requireOrderEntryObjectivesValues();
+  const currentCase = loadOrderEntryCaseData();
   const displayTabs = new Set(flowValues.tabs.map((item) => item.toLowerCase()));
   const orderAction = (objectivesValues.orderAction || budgetFlightValues.orderAction || config.orderEntryAction || 'create').toLowerCase();
+  const generateValidations = shouldGenerateOrderEntryValidations(basicSetupValues.adServer);
 
   await loginAsDefaultUser();
 
@@ -235,6 +248,13 @@ async function runOrderEntryEndToEnd(
       splitsAllocations: flowValues.splitsAllocationList,
       confirmationMessages: flowValues.confirmationMessages
     });
+    if (generateValidations && currentCase) {
+      await queueCurrentOrderEntryValidations(page, {
+        testCaseName: currentCase.test_case_name,
+        adServer: basicSetupValues.adServer,
+        lineItemName: basicSetupValues.lineItemName
+      });
+    }
   } else if (orderSubmitType === 'invalid-order') {
     await verifySubmitOrderDisabled(page);
   } else if (config.orderEntrySaveDraft) {
@@ -246,17 +266,28 @@ async function runOrderEntryEndToEnd(
   }
 }
 
-const selectedCases = loadOrderEntryCaseSummaries();
-
 if (selectedCases.length === 0) {
   test('frontend: order entry end-to-end batch requires matching filters', async () => {
     throw new Error(buildOrderEntryCaseSelectionError());
   });
 }
 
+test.beforeAll(async () => {
+  if (batchValidationEnabled) {
+    await clearValidationQueueFile();
+  }
+});
+
+test.afterAll(async ({ request }) => {
+  if (batchValidationEnabled && shouldRunOrderEntryValidations()) {
+    await runQueuedOrderEntryValidations(request);
+  }
+});
+
 for (const selectedCase of selectedCases) {
   test(`frontend: order entry end-to-end for DB object ${selectedCase.objectId} (${selectedCase.testCaseName})`, async ({
     page,
+    request,
     loginAsDefaultUser,
     impersonateConfiguredUser
   }) => {
@@ -274,7 +305,7 @@ for (const selectedCase of selectedCases) {
     delete process.env.ADDAPTIVE_ORDER_ENTRY_DB_TEST_CASE_NAME;
 
     try {
-      await runOrderEntryEndToEnd(page, loginAsDefaultUser, impersonateConfiguredUser);
+      await runOrderEntryEndToEnd(page, request, loginAsDefaultUser, impersonateConfiguredUser);
     } finally {
       if (previousObjectId === undefined) {
         delete process.env.ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID;
