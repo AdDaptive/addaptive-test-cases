@@ -447,6 +447,8 @@ function resolveProviderRuntime(provider: ValidationProvider): ProviderRuntime {
 
 function loadValidationMappings(provider: ValidationProvider): MappingEntry[] {
   const table = config.orderEntryValidationMappingTable;
+  const tableRef = parseQualifiedTableName(table);
+  const hasSortOrder = tableHasColumn(tableRef.schema, tableRef.table, 'sort_order');
   const rows = queryJson<
     Array<{
       provider: string | null;
@@ -465,11 +467,11 @@ function loadValidationMappings(provider: ValidationProvider): MappingEntry[] {
       operator,
       transform_key,
       enabled,
-      sort_order
+      ${hasSortOrder ? 'sort_order' : 'null::integer as sort_order'}
     from ${table}
     where enabled = true
       and upper(provider) = ${sqlLiteral(provider)}
-    order by sort_order asc, id asc
+    order by ${hasSortOrder ? 'sort_order asc,' : ''} id asc
   `);
 
   return rows
@@ -481,6 +483,26 @@ function loadValidationMappings(provider: ValidationProvider): MappingEntry[] {
       transformKey: String(row.transform_key || '').trim() || undefined
     }))
     .filter((row) => row.field && row.path);
+}
+
+function parseQualifiedTableName(value: string): { schema: string; table: string } {
+  const parts = value.split('.').map((item) => item.trim()).filter(Boolean);
+  if (parts.length === 1) {
+    return { schema: 'public', table: parts[0] };
+  }
+  return { schema: parts[0], table: parts[1] };
+}
+
+function tableHasColumn(schema: string, table: string, column: string): boolean {
+  const rows = queryJson<Array<{ column_name: string }>>(`
+    select column_name
+    from information_schema.columns
+    where table_schema = ${sqlLiteral(schema)}
+      and table_name = ${sqlLiteral(table)}
+      and column_name = ${sqlLiteral(column)}
+  `);
+
+  return rows.length > 0;
 }
 
 function applyObjectViewerTemplate(
