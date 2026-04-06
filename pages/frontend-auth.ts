@@ -8,10 +8,13 @@ export async function loginToFrontend(page: Page, username: string, password: st
   const loginDiagnostics = createFrontendLoginDiagnostics(page);
 
   await page.goto(baseUrl);
-  await usernameInput.waitFor({ state: 'visible' });
-  await usernameInput.fill(username);
-  await passwordInput.fill(password);
-  await loginButton.click();
+  const loginFormVisible = await usernameInput.waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
+
+  if (loginFormVisible) {
+    await usernameInput.fill(username);
+    await passwordInput.fill(password);
+    await loginButton.click();
+  }
 
   await waitForFrontendSessionReady(page, loginDiagnostics).finally(() => {
     loginDiagnostics.dispose();
@@ -117,7 +120,7 @@ export async function impersonateFrontendUser(page: Page, email: string): Promis
 
   const impersonateInput = katalonLocator(page, 'Object Repository/Frontend/Impersonate-User/input_ImpersonateUserEmail');
   await impersonateInput.fill('');
-  await impersonateInput.pressSequentially(email, { delay: 50 });
+  await impersonateInput.fill(email);
 
   const exactOption = page
     .locator('ngb-typeahead-window button')

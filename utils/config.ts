@@ -130,6 +130,68 @@ export const config = {
   get orderEntryDbRange(): string | undefined {
     return optional('ADDAPTIVE_ORDER_ENTRY_DB_RANGE');
   },
+  get orderEntryGenerateValidations(): boolean {
+    return bool('ADDAPTIVE_ORDER_ENTRY_GENERATE_VALIDATIONS') || bool('ADDAPTIVE_ORDER_ENTRY_RUN_VALIDATIONS');
+  },
+  get orderEntryRunValidations(): boolean {
+    return bool('ADDAPTIVE_ORDER_ENTRY_RUN_VALIDATIONS');
+  },
+  get orderEntryValidationQueueFile(): string | undefined {
+    return optional('ADDAPTIVE_ORDER_ENTRY_VALIDATION_QUEUE_FILE');
+  },
+  get orderEntryValidationMappingTable(): string {
+    return optional('ADDAPTIVE_ORDER_ENTRY_VALIDATION_MAPPING_TABLE') || 'order_entry_validation_mapping';
+  },
+  get orderEntryValidationRetryAttempts(): number {
+    const parsed = Number(read('ADDAPTIVE_ORDER_ENTRY_VALIDATION_RETRY_ATTEMPTS') || '10');
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 10;
+  },
+  get orderEntryValidationRetryDelayMs(): number {
+    const parsed = Number(read('ADDAPTIVE_ORDER_ENTRY_VALIDATION_RETRY_DELAY_MS') || '10000');
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 10000;
+  },
+  get mediaMathObjectViewerUrlTemplate(): string | undefined {
+    return optional('ADDAPTIVE_MEDIAMATH_OBJECT_VIEWER_URL_TEMPLATE');
+  },
+  get tradeDeskObjectViewerUrlTemplate(): string | undefined {
+    return optional('ADDAPTIVE_TRADEDESK_OBJECT_VIEWER_URL_TEMPLATE');
+  },
+  get mediaMathObjectViewerObjectType(): string | undefined {
+    return optional('ADDAPTIVE_MEDIAMATH_OBJECT_VIEWER_OBJECT_TYPE');
+  },
+  get tradeDeskObjectViewerObjectType(): string | undefined {
+    return optional('ADDAPTIVE_TRADEDESK_OBJECT_VIEWER_OBJECT_TYPE');
+  },
+  get mediaMathObjectViewerIdField(): string | undefined {
+    return optional('ADDAPTIVE_MEDIAMATH_OBJECT_VIEWER_ID_FIELD');
+  },
+  get tradeDeskObjectViewerIdField(): string | undefined {
+    return optional('ADDAPTIVE_TRADEDESK_OBJECT_VIEWER_ID_FIELD');
+  },
+  get clientSettingsDbTable(): string | undefined {
+    return optional('ADDAPTIVE_CLIENT_SETTINGS_DB_TABLE');
+  },
+  get clientSettingsGroupTable(): string | undefined {
+    return optional('ADDAPTIVE_CLIENT_SETTINGS_GROUP_TABLE');
+  },
+  get clientSettingsStepTable(): string | undefined {
+    return optional('ADDAPTIVE_CLIENT_SETTINGS_STEP_TABLE');
+  },
+  get clientSettingsDbId(): string | undefined {
+    return optional('ADDAPTIVE_CLIENT_SETTINGS_DB_ID');
+  },
+  get clientSettingsDbTestCaseName(): string | undefined {
+    return optional('ADDAPTIVE_CLIENT_SETTINGS_DB_TEST_CASE_NAME');
+  },
+  get clientSettingsDbIds(): string[] {
+    return list('ADDAPTIVE_CLIENT_SETTINGS_DB_IDS');
+  },
+  get clientSettingsDbRange(): string | undefined {
+    return optional('ADDAPTIVE_CLIENT_SETTINGS_DB_RANGE');
+  },
+  get clientSettingsAdServer(): string | undefined {
+    return optional('ADDAPTIVE_CLIENT_SETTINGS_AD_SERVER');
+  },
   get orderEntryCreativeDbObjectId(): string | undefined {
     return optional('ADDAPTIVE_ORDER_ENTRY_CREATIVE_DB_OBJECT_ID');
   },

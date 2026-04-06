@@ -948,14 +948,28 @@ async function selectAdServerOnce(locator: Locator, label: string, timeoutMs = 5
   return normalizeLabel(await readSelectedOptionLabel(locator)) === normalizeLabel(label);
 }
 
+async function describeSelectOptions(locator: Locator): Promise<{ selectedLabel: string; availableOptions: string[] }> {
+  const selectedLabel = await readSelectedOptionLabel(locator);
+  const availableOptions = await locator
+    .locator('option')
+    .evaluateAll((options) => options.map((option) => (option.textContent || '').replace(/\s+/g, ' ').trim()))
+    .catch(() => []);
+
+  return {
+    selectedLabel,
+    availableOptions
+  };
+}
+
 async function acceptGenericConfirmationIfVisible(page: Page, timeoutMs = 3000): Promise<boolean> {
-  const confirmationContinue = katalonLocator(page, 'Object Repository/Frontend/Generic/Generic Modal');
+  const confirmationContinue = page.locator('#generic-confirm-modal-continue').first();
   const deadline = Date.now() + timeoutMs;
 
   while (Date.now() < deadline) {
     if (await confirmationContinue.isVisible().catch(() => false)) {
+      await confirmationContinue.waitFor({ state: 'visible', timeout: 10000 });
       await confirmationContinue.click();
-          await confirmationContinue.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => undefined);
+      await confirmationContinue.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => undefined);
       await waitForUiToSettle(page, 2000);
       await page.waitForLoadState('networkidle').catch(() => undefined);
       return true;
@@ -1017,10 +1031,14 @@ async function establishObjectivesAdServer(page: Page, expectedAdServer: string)
   const adServerDropdown = katalonLocator(page, 'Object Repository/Frontend/Order-Entry/Basic-Setup-Tab/select_BasicSetupAdServer');
 
   for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const before = await describeSelectOptions(adServerDropdown);
     const selected = await selectAdServerOnce(adServerDropdown, expectedAdServer, 5000);
+    const after = await describeSelectOptions(adServerDropdown);
     if (!selected) {
       const current = await readSelectedOptionLabel(adServerDropdown);
-      throw new Error(`Failed to apply ad server "${expectedAdServer}". Current UI value is "${current || '<unset>'}".`);
+      throw new Error(
+        `Failed to apply ad server "${expectedAdServer}". Before selected="${before.selectedLabel || '<unset>'}", after selected="${after.selectedLabel || '<unset>'}". Options: ${JSON.stringify(after.availableOptions)}. Current UI value is "${current || '<unset>'}".`
+      );
     }
 
     await acceptGenericConfirmationIfVisible(page, 5000);
