@@ -5,11 +5,94 @@ Standalone Playwright repository for Addaptive test automation.
 ## Structure
 
 - `.env`: tracked shared environment defaults for the suite
+- `.env.local`: ignored local overrides layered on top of `.env`
 - `tests/`: Playwright specs
 - `fixtures/`: shared fixtures for auth, impersonation, and bootstrap
 - `utils/`: environment and helper utilities
 - `locators/`: generated locator catalogs from the Katalon object repository
 - `migration-tools/`: scripts used during the Katalon-to-Playwright migration
+- `scripts/`: local utility scripts such as DB sync
+
+## Local DB Sync
+
+Use the repo’s Postgres dump/restore wrapper when you want to pull an allowlisted subset of production tables into a local database.
+
+Config file:
+
+```text
+scripts/db-sync.config.json
+```
+
+Fields:
+
+- `schemaTables`: tables to dump with `--schema-only`
+- `dataTables`: tables to dump with `--data-only`
+- `postRestoreSql`: optional SQL statements to run after restore
+
+Example:
+
+```json
+{
+  "schemaTables": [
+    "public.order_entry_suite",
+    "public.order_entry_creatives"
+  ],
+  "dataTables": [
+    "public.order_entry_suite",
+    "public.order_entry_creatives"
+  ],
+  "postRestoreSql": []
+}
+```
+
+Source DB env vars:
+
+```env
+ADDAPTIVE_SYNC_SOURCE_DB_HOST=prod-host
+ADDAPTIVE_SYNC_SOURCE_DB_PORT=5432
+ADDAPTIVE_SYNC_SOURCE_DB_NAME=prod-db
+ADDAPTIVE_SYNC_SOURCE_DB_USER=readonly-user
+ADDAPTIVE_SYNC_SOURCE_DB_PASSWORD=readonly-password
+```
+
+Target DB env vars:
+
+```env
+ADDAPTIVE_SYNC_TARGET_DB_HOST=127.0.0.1
+ADDAPTIVE_SYNC_TARGET_DB_PORT=5432
+ADDAPTIVE_SYNC_TARGET_DB_NAME=addaptive_test_cases
+ADDAPTIVE_SYNC_TARGET_DB_USER=addaptive_local
+ADDAPTIVE_SYNC_TARGET_DB_PASSWORD=addaptive_local
+```
+
+Target values fall back to `ADDAPTIVE_DB_*` if the `ADDAPTIVE_SYNC_TARGET_DB_*` variables are unset.
+
+Safety rules:
+
+1. The tool refuses to restore into a non-local target host.
+2. The tool requires `--confirm-prod` for schema/data/sync/restore commands.
+3. The tool only syncs tables explicitly listed in `scripts/db-sync.config.json`.
+
+Commands:
+
+```bash
+npm run db:sync:plan
+npm run db:sync:plan:all
+npm run db:sync:schema
+npm run db:sync:schema:all
+npm run db:sync:data
+npm run db:sync:data:all
+npm run db:sync
+npm run db:sync:all
+```
+
+Artifacts are written to:
+
+```text
+tmp/db-sync/<timestamp>/
+```
+
+If you want to pull every table in schema `public` instead of using the allowlist config, use the `:all` variants. They discover tables from the source DB at runtime and still require `--confirm-prod` under the hood.
 
 ## Initial workflow
 
