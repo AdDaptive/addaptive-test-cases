@@ -270,6 +270,42 @@ async function waitUntilEnabled(locator: Locator, timeoutMs = 5000): Promise<boo
   return false;
 }
 
+async function resolveFirstUsableFileInput(
+  candidates: Array<Locator | null | undefined>,
+  timeoutMs = 3000
+): Promise<Locator | null> {
+  for (const candidate of candidates) {
+    if (!candidate) {
+      continue;
+    }
+    const ready = await waitUntilEnabled(candidate, timeoutMs).catch(() => false);
+    if (ready) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+async function waitForUploadedFileLabel(
+  container: Locator,
+  timeoutMs = 10000
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const uploadedLabel = container.locator('.file-uploaded').first();
+    const labelText = ((await uploadedLabel.textContent().catch(() => '')) || '').trim();
+    if (labelText && !/no file uploaded/i.test(labelText)) {
+      return true;
+    }
+
+    await container.page().waitForTimeout(200);
+  }
+
+  return false;
+}
+
 async function waitForUiToSettle(page: Page, timeoutMs = 10000): Promise<void> {
   await page.waitForLoadState('networkidle').catch(() => undefined);
   await page
@@ -2221,33 +2257,55 @@ export async function addBannerCreativeOnCurrentPage(page: Page, options: Banner
             : normalizedCreativeType === 'html 5'
               ? ['Object Repository/Frontend/Order-Entry/Creatives-Tab/Banner/HTML5 Upload']
               : ['Object Repository/Frontend/Order-Entry/Creatives-Tab/Banner/Image Upload'];
-    let uploadInput: Locator | null = null;
+    const uploadControlName =
+      creativeCategory === 'video'
+        ? 'Video Upload'
+        : creativeCategory === 'audio'
+          ? 'Audio Upload'
+          : creativeCategory === 'native'
+            ? 'Image Upload'
+            : normalizedCreativeType === 'html 5'
+              ? 'HTML5 Upload'
+              : 'Image Upload';
+    const uploadContainer = creativeArticle.locator(`app-file-selector[name="${uploadControlName}"]`).first();
+    const uploadCandidates: Array<Locator | null> = [];
     for (const uploadPath of uploadPaths) {
-      const candidate = maybeKatalonLocator(page, uploadPath, { creativeIndex: typeIndex });
-      if (!candidate) {
-        continue;
-      }
-      if (await waitUntilEnabled(candidate, 2000)) {
-        uploadInput = candidate;
-        break;
-      }
+      uploadCandidates.push(maybeKatalonLocator(page, uploadPath, { creativeIndex: typeIndex }));
     }
+    uploadCandidates.push(uploadContainer.locator('input[type="file"]').first());
+    uploadCandidates.push(creativeArticle.locator('input[type="file"]').first());
+
+    const uploadInput = await resolveFirstUsableFileInput(uploadCandidates, 2000);
     if (!uploadInput) {
       throw new Error('Creative upload input is not available for the selected creative type.');
     }
     await uploadInput.setInputFiles(resolvedAssetPath);
+    const uploadRegistered = await waitForUploadedFileLabel(uploadContainer, 10000).catch(() => false);
+    if (!uploadRegistered) {
+      throw new Error(`Creative upload did not register for file: ${options.filePath}`);
+    }
 
     if (creativeCategory === 'native') {
       const resolvedIconAssetPath = resolveCreativeAssetPath(options.iconFilePath) || resolvedAssetPath;
-      const iconUploadInput = maybeKatalonLocator(
-        page,
-        'Object Repository/Frontend/Order-Entry/Creatives-Tab/Native/Icon Upload',
-        { creativeIndex: typeIndex }
+      const iconUploadContainer = creativeArticle.locator('app-file-selector[name="Icon Upload"]').first();
+      const iconUploadInput = await resolveFirstUsableFileInput(
+        [
+          maybeKatalonLocator(page, 'Object Repository/Frontend/Order-Entry/Creatives-Tab/Native/Icon Upload', {
+            creativeIndex: typeIndex
+          }),
+          iconUploadContainer.locator('input[type="file"]').first(),
+          creativeArticle.locator('input[type="file"]').nth(1)
+        ],
+        3000
       );
-      if (!iconUploadInput || !(await waitUntilEnabled(iconUploadInput, 3000))) {
+      if (!iconUploadInput) {
         throw new Error('Native icon upload input is not available for the selected creative type.');
       }
       await iconUploadInput.setInputFiles(resolvedIconAssetPath);
+      const iconRegistered = await waitForUploadedFileLabel(iconUploadContainer, 10000).catch(() => false);
+      if (!iconRegistered) {
+        throw new Error(`Native icon upload did not register for file: ${options.iconFilePath || options.filePath}`);
+      }
     }
   }
 
