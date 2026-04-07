@@ -1,7 +1,9 @@
 import { test } from '../../fixtures/session';
 import { createSplit, deleteSplit, editSplit, openOrderEntryPage, saveOrderAsDraft, verifySplitGroupCount } from '../../pages/order-entry';
-import { requireOrderEntrySplitValues } from '../../utils/order-entry-db';
+import { requireOrderEntryFlowValues, requireOrderEntrySplitValues } from '../../utils/order-entry-db';
 import { config } from '../../utils/config';
+import { env } from '../../utils/env';
+import { shouldUseOrderEntryImpersonation } from '../../utils/auth-config';
 
 test('frontend: order entry splits tab is scriptable', async ({
   page,
@@ -9,10 +11,11 @@ test('frontend: order entry splits tab is scriptable', async ({
   impersonateConfiguredUser
 }) => {
   const dbValues = requireOrderEntrySplitValues();
+  const flowValues = requireOrderEntryFlowValues();
 
   await loginAsDefaultUser();
 
-  if (config.orderEntryUseImpersonation) {
+  if (shouldUseOrderEntryImpersonation({ impersonateUserProfile: flowValues.impersonateUserProfile }, [env.impersonateUser, env.orderEntryImpersonateUser])) {
     await impersonateConfiguredUser();
   }
 

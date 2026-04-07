@@ -19,8 +19,10 @@ import {
   verifyOrderEntryAdServerSelection
 } from '../../pages/order-entry';
 import { tryLoadClientSettingsSuiteGroups } from '../../utils/client-settings-suite-db';
+import type { ClientSettingsSuiteGroup } from '../../utils/client-settings-suite-db';
 import { config } from '../../utils/config';
 import { env, requiredEnv } from '../../utils/env';
+import { resolveFrontendLogin } from '../../utils/auth-config';
 
 type FrontendContext = {
   adServer?: string;
@@ -178,6 +180,7 @@ async function ensureFrontendPage(params: {
 
 async function runSpecialFrontendAction(params: {
   page: Page;
+  currentGroup: ClientSettingsSuiteGroup;
   fieldName: string;
   fieldValue: string;
   context: FrontendContext;
@@ -192,6 +195,7 @@ async function runSpecialFrontendAction(params: {
 }): Promise<void> {
   const {
     page,
+    currentGroup,
     fieldName,
     fieldValue,
     context,
@@ -229,11 +233,16 @@ async function runSpecialFrontendAction(params: {
   }
   if (command === 'login_frontend') {
     if (resolvedFieldValue.trim().toLowerCase() === 'admin') {
+      const login = resolveFrontendLogin({
+        username: currentGroup.username,
+        password: currentGroup.password,
+        baseUrl: env.frontendUrl || requiredEnv('ADDAPTIVE_FRONTEND_URL')
+      });
       await loginToFrontend(
         page,
-        requiredEnv('ADDAPTIVE_LOGIN_USER'),
-        requiredEnv('ADDAPTIVE_LOGIN_PASSWORD'),
-        env.frontendUrl || requiredEnv('ADDAPTIVE_FRONTEND_URL')
+        login.username,
+        login.password,
+        login.baseUrl || ''
       );
       setUseClientFacingAdServerLabels(false);
       setFrontendReady(true);
@@ -568,6 +577,7 @@ for (const run of selection.groups) {
             if (isSpecialFrontendCommand(fieldName)) {
               await runSpecialFrontendAction({
                 page,
+                currentGroup: group,
                 fieldName,
                 fieldValue,
                 context,

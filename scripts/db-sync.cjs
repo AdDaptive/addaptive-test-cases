@@ -11,16 +11,38 @@ const repoRoot = process.cwd();
 const defaultConfigPath = path.resolve(repoRoot, 'scripts/db-sync.config.json');
 
 function loadEnvFiles() {
-  const baseEnvFile = path.resolve(process.cwd(), '.env');
-  const localEnvFile = path.resolve(process.cwd(), '.env.local');
+  for (const envFile of getEnvFiles()) {
+    if (fs.existsSync(envFile.path)) {
+      loadDotEnvFile({ path: envFile.path, override: envFile.override });
+    }
+  }
+}
 
-  if (fs.existsSync(baseEnvFile)) {
-    loadDotEnvFile({ path: baseEnvFile, override: false });
+function getEnvFiles() {
+  const cwd = process.cwd();
+  const envName = normalizeValue(process.env.ADDAPTIVE_ENV);
+  const explicitEnvFile = normalizeValue(process.env.ADDAPTIVE_ENV_FILE);
+  const files = [{ path: path.resolve(cwd, '.env'), override: false }];
+
+  if (envName) {
+    files.push({ path: path.resolve(cwd, `.env.${envName}`), override: true });
   }
 
-  if (fs.existsSync(localEnvFile)) {
-    loadDotEnvFile({ path: localEnvFile, override: true });
+  files.push({ path: path.resolve(cwd, '.env.local'), override: true });
+
+  if (envName) {
+    files.push({ path: path.resolve(cwd, `.env.${envName}.local`), override: true });
   }
+
+  if (explicitEnvFile) {
+    files.push({ path: path.resolve(cwd, explicitEnvFile), override: true });
+  }
+
+  return files;
+}
+
+function normalizeValue(value) {
+  return value && String(value).trim() ? String(value).trim() : undefined;
 }
 
 function optionalEnv(name) {

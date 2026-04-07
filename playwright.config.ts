@@ -8,10 +8,12 @@ loadEnv();
 const baseURL = process.env.ADDAPTIVE_FRONTEND_URL;
 const braveExecutableOverride = process.env.ADDAPTIVE_BRAVE_EXECUTABLE_PATH;
 const workersOverride = process.env.ADDAPTIVE_PLAYWRIGHT_WORKERS?.trim();
+const defaultWorkers = 2;
+const maxWorkers = 4;
 
 function resolveWorkersOverride(): number | undefined {
   if (!workersOverride) {
-    return undefined;
+    return defaultWorkers;
   }
 
   const parsed = Number(workersOverride);
@@ -19,7 +21,7 @@ function resolveWorkersOverride(): number | undefined {
     throw new Error(`Invalid ADDAPTIVE_PLAYWRIGHT_WORKERS "${workersOverride}". Expected a positive integer.`);
   }
 
-  return parsed;
+  return Math.min(parsed, maxWorkers);
 }
 
 function resolveBraveExecutablePath(): string | undefined {

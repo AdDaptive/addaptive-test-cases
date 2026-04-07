@@ -2,16 +2,138 @@
 
 Standalone Playwright repository for Addaptive test automation.
 
+Playwright worker defaults:
+
+- default worker count is `2`
+- `ADDAPTIVE_PLAYWRIGHT_WORKERS` can override it
+- worker count is capped at `4` unless you intentionally change the repo rule
+
 ## Structure
 
 - `.env`: tracked shared environment defaults for the suite
 - `.env.local`: ignored local overrides layered on top of `.env`
+- `.env.<name>`: optional named environment file such as `.env.ali`
+- `.env.<name>.local`: ignored named local override such as `.env.ali.local`
 - `tests/`: Playwright specs
 - `fixtures/`: shared fixtures for auth, impersonation, and bootstrap
 - `utils/`: environment and helper utilities
 - `locators/`: generated locator catalogs from the Katalon object repository
 - `migration-tools/`: scripts used during the Katalon-to-Playwright migration
 - `scripts/`: local utility scripts such as DB sync
+
+## Environment Selection
+
+The suite supports named env files and suite-based defaults.
+
+Named dev server files:
+
+```text
+.env.dev
+.env.dev2
+.env.dev3
+.env.dev4
+.env.ali
+.env.design
+```
+
+Load order:
+
+1. `.env`
+2. `.env.<name>` when `ADDAPTIVE_ENV=<name>` is set or inferred
+3. `.env.local`
+4. `.env.<name>.local` when `ADDAPTIVE_ENV=<name>` is set or inferred
+5. a specific file from `ADDAPTIVE_ENV_FILE=<path>` if provided
+
+Explicit selection always wins:
+
+```bash
+ADDAPTIVE_ENV=dev npx playwright test tests/frontend/insight-studio-end-to-end.spec.ts --project=chromium
+ADDAPTIVE_ENV=ali npm run test:oe:mm:create
+ADDAPTIVE_ENV_FILE=.env.design npx playwright test tests/frontend/client-settings-mediamath-defaults.spec.ts --project=chromium
+```
+
+Default suite mapping when you do not set an environment:
+
+- Order Entry suites default to `ali`
+- Audience suites default to `ali`
+- Backend and API suites default to `ali`
+- Insight Studio suites default to `dev`
+
+Typical URLs in those files:
+
+```env
+ADDAPTIVE_FRONTEND_URL=https://<server>.dev-frontend-upgrade.addaptive.com/orders
+ADDAPTIVE_BACKEND_URL=https://<server>.addaptive.com
+```
+
+Examples:
+
+```env
+ADDAPTIVE_FRONTEND_URL=https://ali.dev-frontend-upgrade.addaptive.com/
+ADDAPTIVE_BACKEND_URL=https://ali.addaptive.com
+```
+
+## Auth Precedence
+
+Frontend login and impersonation resolve in this order:
+
+1. `ADDAPTIVE_LOGIN_USER_OVERRIDE`, `ADDAPTIVE_LOGIN_PASSWORD_OVERRIDE`, and `ADDAPTIVE_IMPERSONATE_USER_OVERRIDE`
+2. suite-table row values such as `username`, `password`, and `impersonate_user_profile` when present
+3. shared defaults from `.env` or the selected named env files
+
+Order Entry impersonation behavior:
+
+1. if `ADDAPTIVE_ORDER_ENTRY_USE_IMPERSONATION` is explicitly set, that value wins
+2. otherwise Order Entry impersonates automatically when the suite row or override env supplies an impersonation target
+
+Current suite-table support:
+
+- `order_entry_suite`: `username`, `password`, `impersonate_user_profile`
+- `audiences_suite`: `impersonate_user_profile`, plus `username` and `password` if those columns exist
+- `insight_studio_suite`: `impersonate_use_profile`, plus `username` and `password` if those columns exist
+- `client_settings_preflight_suite`: `username`, `password`, and `impersonate_user_profile` when present
+
+## Quick Rules
+
+- Keep shared DB credentials and shared login defaults in `.env`
+- Keep environment-specific frontend and backend URLs in `.env.<name>`
+- Use `.env.local` or `.env.<name>.local` for personal overrides
+- Use the `*_OVERRIDE` env vars only when you need to force credentials instead of using the suite row
+
+Common examples:
+
+```bash
+npm run test:oe:mm:create
+```
+
+Uses the default Order Entry environment, which is `ali`.
+
+```bash
+npx playwright test tests/frontend/insight-studio-end-to-end.spec.ts --project=chromium
+```
+
+Uses the default Insight Studio environment, which is `dev`.
+
+```bash
+ADDAPTIVE_ENV=dev2 npm run test:oe:mm:create
+```
+
+Forces Order Entry to run against `dev2` instead of the default `ali`.
+
+```bash
+ADDAPTIVE_LOGIN_USER_OVERRIDE=user@example.com ADDAPTIVE_LOGIN_PASSWORD_OVERRIDE=secret npx playwright test tests/frontend/order-entry-end-to-end.spec.ts --project=chromium
+```
+
+Forces frontend login credentials even if the suite row has `username` and `password`.
+
+For VS Code Playwright runs, use [.env.local.example](/srv/apps/work/addaptive-test-cases/.env.local.example) as the starting point for your local `.env.local`. Set `ADDAPTIVE_ENV` to choose the dev server and set the suite row selector variables there so the Playwright extension can run the correct row without shell prefixes.
+
+Order Entry selection notes:
+
+- `ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID`, `ADDAPTIVE_ORDER_ENTRY_DB_IDS`, and `ADDAPTIVE_ORDER_ENTRY_DB_RANGE` can run rows directly
+- `ADDAPTIVE_ORDER_ENTRY_AD_SERVER` and `ADDAPTIVE_ORDER_ENTRY_ACTION` are optional narrowing filters
+- `ADDAPTIVE_ORDER_ENTRY_DB_RANGE` accepts either `1-3` or a single value like `1`
+- `ADDAPTIVE_ORDER_ENTRY_DB_RANGE` is positional inside the filtered result set when filters are provided, or across the full `order_entry_suite` ordering when they are not
 
 ## Local DB Sync
 
@@ -108,7 +230,7 @@ Generated output is scaffolding only. Shared flows, waits, and assertions should
 
 ## Order Entry End-to-End
 
-Use the single spec when you want to run one Order Entry row. Use the batch spec when you want to generate many tests from DB-selected rows.
+Use the Order Entry end-to-end spec for both single-row and multi-row DB-driven runs.
 
 Single end-to-end (one row):
 
@@ -122,38 +244,38 @@ Single end-to-end with browser visible:
 ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID=1 npx playwright test tests/frontend/order-entry-end-to-end.spec.ts --project=chromium --headed --reporter=line
 ```
 
-Batch end-to-end using a positional range within the filtered result set:
+Multi-row end-to-end using a positional range within the filtered result set:
 
 ```bash
-ADDAPTIVE_ORDER_ENTRY_AD_SERVER=MEDIAMATH ADDAPTIVE_ORDER_ENTRY_ACTION=create ADDAPTIVE_ORDER_ENTRY_DB_RANGE=1-20 npx playwright test tests/frontend/order-entry-end-to-end-batch.spec.ts --project=chromium --reporter=line
+ADDAPTIVE_ORDER_ENTRY_AD_SERVER=MEDIAMATH ADDAPTIVE_ORDER_ENTRY_ACTION=create ADDAPTIVE_ORDER_ENTRY_DB_RANGE=1-20 npx playwright test tests/frontend/order-entry-end-to-end.spec.ts --project=chromium --reporter=line
 ```
 
-Batch end-to-end using explicit IDs:
+Multi-row end-to-end using explicit IDs:
 
 ```bash
-ADDAPTIVE_ORDER_ENTRY_AD_SERVER=MEDIAMATH ADDAPTIVE_ORDER_ENTRY_ACTION=edit ADDAPTIVE_ORDER_ENTRY_DB_IDS=1,4,15,20 npx playwright test tests/frontend/order-entry-end-to-end-batch.spec.ts --project=chromium --reporter=line
+ADDAPTIVE_ORDER_ENTRY_AD_SERVER=MEDIAMATH ADDAPTIVE_ORDER_ENTRY_ACTION=edit ADDAPTIVE_ORDER_ENTRY_DB_IDS=1,4,15,20 npx playwright test tests/frontend/order-entry-end-to-end.spec.ts --project=chromium --reporter=line
 ```
 
-Batch filtered by ad server and action without DB selectors (runs all matching rows):
+Filtered multi-row run by ad server and action without DB selectors:
 
 ```bash
-ADDAPTIVE_ORDER_ENTRY_AD_SERVER=MEDIAMATH ADDAPTIVE_ORDER_ENTRY_ACTION=create npx playwright test tests/frontend/order-entry-end-to-end-batch.spec.ts --project=brave-ubuntu --reporter=line
+ADDAPTIVE_ORDER_ENTRY_AD_SERVER=MEDIAMATH ADDAPTIVE_ORDER_ENTRY_ACTION=create npx playwright test tests/frontend/order-entry-end-to-end.spec.ts --project=brave-ubuntu --reporter=line
 ```
 
-Required batch filters:
+Optional filtering fields:
 
 1. `ADDAPTIVE_ORDER_ENTRY_AD_SERVER`
 Allowed values: `MEDIAMATH`, `DFP`, `PMP`, `DPM`, `MEDIAMATH_GAM`, `TRADEDESK`
 2. `ADDAPTIVE_ORDER_ENTRY_ACTION`
 Allowed values: `create`, `edit`
 
-Optional DB selectors (used by batch selection):
+DB selectors:
 
 1. `ADDAPTIVE_ORDER_ENTRY_DB_IDS`
 2. `ADDAPTIVE_ORDER_ENTRY_DB_RANGE` (1-based positional range after applying `ADDAPTIVE_ORDER_ENTRY_AD_SERVER` and `ADDAPTIVE_ORDER_ENTRY_ACTION`)
 3. `ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID`
 
-If no DB selector is provided, batch runs all rows that match the required ad server + action filters.
+If no DB selector is provided, the suite runs all rows that match the active ad server + action filters.
 
 Note: Order Entry tab selection is now driven by a fixed per-ad-server tab map in code, not by the `display_tabs` DB field. That field is deprecated and can be removed from the DB/test data when convenient.
 
@@ -182,7 +304,7 @@ Run one suite row with the browser visible:
 ADDAPTIVE_CLIENT_SETTINGS_DB_ID=1 npx playwright test tests/frontend/client-settings-mediamath-defaults.spec.ts --project=chromium --headed --reporter=line
 ```
 
-The suite is separate from the normal Order Entry end-to-end specs. It does not use `order-entry-end-to-end.spec.ts` or `order-entry-end-to-end-batch.spec.ts`.
+The suite is separate from the normal Order Entry end-to-end spec. It does not use `order-entry-end-to-end.spec.ts`.
 
 DB model:
 

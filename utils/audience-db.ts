@@ -6,6 +6,9 @@ import { config } from './config';
 type AudienceDbRow = {
   id: string;
   test_case_name: string | null;
+  username: string | null;
+  password: string | null;
+  impersonate_user_profile: string | null;
   audience_action: string | null;
   segment_activation_type: string | null;
   activation_type: string | null;
@@ -48,6 +51,7 @@ type AudienceMatchCriteriaRow = {
 
 let cachedKey: string | null = null;
 let cachedRow: AudienceDbRow | null = null;
+let cachedColumns: Set<string> | null = null;
 
 function currentCacheKey(): string {
   const dbConfig = getAddaptiveDbConfig();
@@ -73,6 +77,22 @@ function sanitizeValue(value?: string | null): string | undefined {
   }
 
   return trimmed;
+}
+
+function getAudienceTableColumns(): Set<string> {
+  if (cachedColumns) {
+    return cachedColumns;
+  }
+
+  const rows = queryJson<Array<{ column_name: string }>>(`
+    select column_name
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'audiences_suite'
+  `);
+
+  cachedColumns = new Set(rows.map((row) => row.column_name));
+  return cachedColumns;
 }
 
 function findFileByBasename(rootDir: string, fileName: string): string | undefined {
@@ -420,35 +440,43 @@ export function loadAudienceCaseData(): AudienceDbRow | null {
   }
 
   const query = `
+    with selected as (
+      select
+        a.id,
+        a.test_case_name,
+        ${getAudienceTableColumns().has('username') ? 'a.username' : 'null::text'} as username,
+        ${getAudienceTableColumns().has('password') ? 'a.password' : 'null::text'} as password,
+        ${getAudienceTableColumns().has('impersonate_user_profile') ? 'a.impersonate_user_profile' : 'null::text'} as impersonate_user_profile,
+        a.audience_action,
+        a.segment_activation_type,
+        a.activation_type,
+        a.email_type,
+        a.hash_type,
+        a.advertiser,
+        a.file_name,
+        a.file_contains_header_row,
+        a.primary_dimensions,
+        a.filter_criteria,
+        a.match_criterias_by_type,
+        a.match_criteria_target,
+        a.bulk_import,
+        a.bulk_import_file_type,
+        a.bulk_import_file_name,
+        a.alert_messages_match_criteria,
+        a.segment_name,
+        a.expiration_date,
+        a.activation_source,
+        a.primary_address_only,
+        a.is_draft_segment,
+        a.object_id,
+        a.existing_segment_name
+      from audiences_suite a
+      where ${filters.join(' and ')}
+    )
     select
-      a.id,
-      a.test_case_name,
-      a.audience_action,
-      a.segment_activation_type,
-      a.activation_type,
-      a.email_type,
-      a.hash_type,
-      a.advertiser,
-      a.file_name,
-      a.file_contains_header_row,
-      a.primary_dimensions,
-      a.filter_criteria,
-      a.match_criterias_by_type,
-      a.match_criteria_target,
-      a.bulk_import,
-      a.bulk_import_file_type,
-      a.bulk_import_file_name,
-      a.alert_messages_match_criteria,
-      a.segment_name,
-      a.expiration_date,
-      a.activation_source,
-      a.primary_address_only,
-      a.is_draft_segment,
-      a.object_id,
-      a.existing_segment_name
-    from audiences_suite a
-    where ${filters.join(' and ')}
-    order by a.id
+      selected.*
+    from selected
+    order by selected.id
     limit 1
   `;
 
@@ -458,6 +486,9 @@ export function loadAudienceCaseData(): AudienceDbRow | null {
 }
 
 export function requireAudienceFlowValues(): {
+  username?: string;
+  password?: string;
+  impersonateUserProfile?: string;
   audienceAction: 'create' | 'edit';
   segmentType?: string;
   isDraftSegment: boolean;
@@ -475,6 +506,9 @@ export function requireAudienceFlowValues(): {
   const audienceAction = normalizedAction === 'edit' ? 'edit' : 'create';
 
   return {
+    username: sanitizeValue(row.username),
+    password: sanitizeValue(row.password),
+    impersonateUserProfile: sanitizeValue(row.impersonate_user_profile),
     audienceAction,
     segmentType: sanitizeValue(row.segment_activation_type) || '1st Party Data',
     isDraftSegment: sanitizeValue(row.is_draft_segment)?.toLowerCase() === 'yes',

@@ -21,8 +21,10 @@ import {
   verifySplitGroupCount
 } from '../../pages/order-entry';
 import {
+  buildOrderEntryCaseSelectionError,
   loadOrderEntryCaseData,
   loadOrderEntryCreativeRowsForCase,
+  loadOrderEntryCaseSummaries,
   requireOrderEntryBasicSetupValues,
   requireOrderEntryAudienceActions,
   requireOrderEntryBudgetFlightValues,
@@ -33,6 +35,8 @@ import {
   requireOrderEntrySplitValues
 } from '../../utils/order-entry-db';
 import { config } from '../../utils/config';
+import { env } from '../../utils/env';
+import { shouldUseOrderEntryImpersonation } from '../../utils/auth-config';
 import {
   clearValidationQueueFile,
   queueCurrentOrderEntryValidations,
@@ -40,6 +44,10 @@ import {
   shouldGenerateOrderEntryValidations,
   shouldRunOrderEntryValidations
 } from '../../utils/order-entry-validation';
+
+const selectedCases = loadOrderEntryCaseSummaries();
+const batchValidationEnabled = selectedCases.some((selectedCase) => shouldGenerateOrderEntryValidations(selectedCase.adServer));
+test.describe.configure({ mode: batchValidationEnabled ? 'serial' : 'parallel' });
 
 function shouldPauseAtEnd(): boolean {
   return config.pauseAtEnd;
@@ -51,8 +59,12 @@ test.afterEach(async ({ page }, testInfo) => {
   }
 });
 
-test('frontend: order entry end-to-end flow is scriptable', async ({ page, request, loginAsDefaultUser, impersonateConfiguredUser }) => {
-  test.setTimeout(90000);
+async function runOrderEntryEndToEnd(
+  page: Parameters<typeof openOrderEntryPage>[0],
+  request: Parameters<typeof runQueuedOrderEntryValidations>[0],
+  loginAsDefaultUser: () => Promise<void>,
+  impersonateConfiguredUser: () => Promise<void>
+): Promise<void> {
   const basicSetupValues = requireOrderEntryBasicSetupValues();
   const audienceActions = requireOrderEntryAudienceActions();
   const budgetFlightValues = requireOrderEntryBudgetFlightValues();
@@ -67,13 +79,9 @@ test('frontend: order entry end-to-end flow is scriptable', async ({ page, reque
   const orderAction = (objectivesValues.orderAction || budgetFlightValues.orderAction || config.orderEntryAction || 'create').toLowerCase();
   const generateValidations = shouldGenerateOrderEntryValidations(basicSetupValues.adServer);
 
-  if (generateValidations) {
-    await clearValidationQueueFile();
-  }
-
   await loginAsDefaultUser();
 
-  if (config.orderEntryUseImpersonation) {
+  if (shouldUseOrderEntryImpersonation({ impersonateUserProfile: flowValues.impersonateUserProfile }, [env.impersonateUser, env.orderEntryImpersonateUser])) {
     await impersonateConfiguredUser();
   }
 
@@ -109,52 +117,51 @@ test('frontend: order entry end-to-end flow is scriptable', async ({ page, reque
   }
 
   if (displayTabs.has('budget & flight')) {
-    await configureOrderEntryBudgetFlight(
-      page,
-      {
-        adServer: budgetFlightValues.adServer,
-        orderAction: budgetFlightValues.orderAction,
-        startDate: budgetFlightValues.startDate,
-        endDate: budgetFlightValues.endDate,
-        subDealId: budgetFlightValues.subDealId,
-        cpmValue: budgetFlightValues.cpmValue,
-        impressionGoal: budgetFlightValues.impressionGoal,
-        optimizationCpm: budgetFlightValues.optimizationCpm,
-        pacingPercentage: budgetFlightValues.pacingPercentage,
-        pacingImpressionType: budgetFlightValues.pacingImpressionType,
-        pacingImpression: budgetFlightValues.pacingImpression,
-        dailyBudget: budgetFlightValues.dailyBudget,
-        xandrLifeBuffer: budgetFlightValues.xandrLifeBuffer,
-        xandrLifeBudget: budgetFlightValues.xandrLifeBudget
-      }
-    );
+    await configureOrderEntryBudgetFlight(page, {
+      adServer: budgetFlightValues.adServer,
+      orderAction: budgetFlightValues.orderAction,
+      startDate: budgetFlightValues.startDate,
+      endDate: budgetFlightValues.endDate,
+      subDealId: budgetFlightValues.subDealId,
+      cpmValue: budgetFlightValues.cpmValue,
+      impressionGoal: budgetFlightValues.impressionGoal,
+      optimizationCpm: budgetFlightValues.optimizationCpm,
+      pacingPercentage: budgetFlightValues.pacingPercentage,
+      pacingImpressionType: budgetFlightValues.pacingImpressionType,
+      pacingImpression: budgetFlightValues.pacingImpression,
+      dailyBudget: budgetFlightValues.dailyBudget,
+      xandrLifeBuffer: budgetFlightValues.xandrLifeBuffer,
+      xandrLifeBudget: budgetFlightValues.xandrLifeBudget
+    });
   }
 
   if (displayTabs.has('inventory')) {
-    await configureOrderEntryInventory(
-      page,
-      {
-        adServer: inventoryValues.adServer,
-        geoTargetingType: inventoryValues.geoTargetingType,
-        geoTargetingItems: inventoryValues.geoTargetingItems || [],
-        profileName: inventoryValues.geoTargetingProfileName,
-        inventoryDevices: inventoryValues.inventoryDevices || [],
-        inventoryItem: inventoryValues.inventoryItem,
-        targetingTypeBrowser: inventoryValues.targetingTypeBrowser,
-        targetingBrowsers: inventoryValues.targetingBrowsers || [],
-        viewabilityThreshold: inventoryValues.viewabilityThreshold,
-        completionRateThreshold: inventoryValues.completionRateThreshold,
-        listenThroughThreshold: inventoryValues.listenThroughThreshold,
-        postBidMeasurement: inventoryValues.postBidMeasurement,
-        supplyStrategy: inventoryValues.supplyStrategy,
-        dealSelectionType: inventoryValues.dealSelectionType,
-        crossDevice: inventoryValues.crossDevice,
-        frequencyCap: inventoryValues.frequencyCap,
-        frequencyCapUnit: undefined,
-        recencyCap: inventoryValues.recencyCap,
-        recencyCapUnit: undefined
-      }
-    );
+    await configureOrderEntryInventory(page, {
+      adServer: inventoryValues.adServer,
+      geoTargetingType: inventoryValues.geoTargetingType,
+      geoTargetingItems: inventoryValues.geoTargetingItems || [],
+      profileName: inventoryValues.geoTargetingProfileName,
+      inventoryDevices: inventoryValues.inventoryDevices || [],
+      inventoryItem: inventoryValues.inventoryItem,
+      targetingTypeBrowser: inventoryValues.targetingTypeBrowser,
+      targetingBrowsers: inventoryValues.targetingBrowsers || [],
+      inventoryInclusionList: inventoryValues.inventoryInclusionList || [],
+      inventoryExclusionList: inventoryValues.inventoryExclusionList || [],
+      viewabilityThreshold: inventoryValues.viewabilityThreshold,
+      completionRateThreshold: inventoryValues.completionRateThreshold,
+      listenThroughThreshold: inventoryValues.listenThroughThreshold,
+      postBidMeasurement: inventoryValues.postBidMeasurement,
+      supplyStrategy: inventoryValues.supplyStrategy,
+      dealSelectionType: inventoryValues.dealSelectionType,
+      crossDevice: inventoryValues.crossDevice,
+      frequencyCapEnabled: inventoryValues.frequencyCapEnabled,
+      frequencyCap: inventoryValues.frequencyCap,
+      frequencyCapUnit: inventoryValues.frequencyCapUnit,
+      recencyCapEnabled: inventoryValues.recencyCapEnabled,
+      recencyCap: inventoryValues.recencyCap,
+      recencyCapUnit: inventoryValues.recencyCapUnit,
+      dayPartingTimeSlots: inventoryValues.dayPartingTimeSlots || []
+    });
   }
 
   if (displayTabs.has('audience')) {
@@ -249,9 +256,6 @@ test('frontend: order entry end-to-end flow is scriptable', async ({ page, reque
         adServer: basicSetupValues.adServer,
         lineItemName: basicSetupValues.lineItemName
       });
-      if (shouldRunOrderEntryValidations()) {
-        await runQueuedOrderEntryValidations(request);
-      }
     }
   } else if (orderSubmitType === 'invalid-order') {
     await verifySubmitOrderDisabled(page);
@@ -262,4 +266,72 @@ test('frontend: order entry end-to-end flow is scriptable', async ({ page, reque
   if (shouldPauseAtEnd()) {
     await page.pause();
   }
+}
+
+if (selectedCases.length === 0) {
+  test('frontend: order entry end-to-end batch requires matching filters', async () => {
+    throw new Error(buildOrderEntryCaseSelectionError());
+  });
+}
+
+test.beforeAll(async () => {
+  if (batchValidationEnabled) {
+    await clearValidationQueueFile();
+  }
 });
+
+test.afterAll(async ({ request }) => {
+  if (batchValidationEnabled && shouldRunOrderEntryValidations()) {
+    await runQueuedOrderEntryValidations(request);
+  }
+});
+
+for (const selectedCase of selectedCases) {
+  test(`frontend: order entry end-to-end for DB object ${selectedCase.objectId} (${selectedCase.testCaseName})`, async ({
+    page,
+    request,
+    loginAsDefaultUser,
+    impersonateConfiguredUser
+  }) => {
+    const timeoutOverride = Number(process.env.ADDAPTIVE_TEST_TIMEOUT_MS || '90000');
+    test.setTimeout(Number.isFinite(timeoutOverride) && timeoutOverride > 0 ? timeoutOverride : 90000);
+
+    const previousObjectId = process.env.ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID;
+    const previousTestCaseName = process.env.ADDAPTIVE_ORDER_ENTRY_DB_TEST_CASE_NAME;
+    const previousAdServer = process.env.ADDAPTIVE_ORDER_ENTRY_AD_SERVER;
+    const previousOrderAction = process.env.ADDAPTIVE_ORDER_ENTRY_ACTION;
+
+    process.env.ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID = selectedCase.objectId;
+    process.env.ADDAPTIVE_ORDER_ENTRY_AD_SERVER = selectedCase.adServer;
+    process.env.ADDAPTIVE_ORDER_ENTRY_ACTION = selectedCase.orderAction;
+    delete process.env.ADDAPTIVE_ORDER_ENTRY_DB_TEST_CASE_NAME;
+
+    try {
+      await runOrderEntryEndToEnd(page, request, loginAsDefaultUser, impersonateConfiguredUser);
+    } finally {
+      if (previousObjectId === undefined) {
+        delete process.env.ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID;
+      } else {
+        process.env.ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID = previousObjectId;
+      }
+
+      if (previousTestCaseName === undefined) {
+        delete process.env.ADDAPTIVE_ORDER_ENTRY_DB_TEST_CASE_NAME;
+      } else {
+        process.env.ADDAPTIVE_ORDER_ENTRY_DB_TEST_CASE_NAME = previousTestCaseName;
+      }
+
+      if (previousAdServer === undefined) {
+        delete process.env.ADDAPTIVE_ORDER_ENTRY_AD_SERVER;
+      } else {
+        process.env.ADDAPTIVE_ORDER_ENTRY_AD_SERVER = previousAdServer;
+      }
+
+      if (previousOrderAction === undefined) {
+        delete process.env.ADDAPTIVE_ORDER_ENTRY_ACTION;
+      } else {
+        process.env.ADDAPTIVE_ORDER_ENTRY_ACTION = previousOrderAction;
+      }
+    }
+  });
+}
