@@ -1,7 +1,9 @@
 import { test } from '../../fixtures/session';
 import { configureOrderEntryInventory, openOrderEntryPage, waitForInventoryTab } from '../../pages/order-entry';
-import { requireOrderEntryInventoryValues } from '../../utils/order-entry-db';
+import { requireOrderEntryFlowValues, requireOrderEntryInventoryValues } from '../../utils/order-entry-db';
 import { config } from '../../utils/config';
+import { env } from '../../utils/env';
+import { shouldUseOrderEntryImpersonation } from '../../utils/auth-config';
 
 test('frontend: order entry inventory tab is scriptable', async ({
   page,
@@ -9,10 +11,11 @@ test('frontend: order entry inventory tab is scriptable', async ({
   impersonateConfiguredUser
 }) => {
   const dbValues = requireOrderEntryInventoryValues();
+  const flowValues = requireOrderEntryFlowValues();
 
   await loginAsDefaultUser();
 
-  if (config.orderEntryUseImpersonation) {
+  if (shouldUseOrderEntryImpersonation({ impersonateUserProfile: flowValues.impersonateUserProfile }, [env.impersonateUser, env.orderEntryImpersonateUser])) {
     await impersonateConfiguredUser();
   }
 
@@ -41,9 +44,10 @@ test('frontend: order entry inventory tab is scriptable', async ({
 });
 
 test('frontend: order entry inventory tab renders', async ({ page, loginAsDefaultUser, impersonateConfiguredUser }) => {
+  const flowValues = requireOrderEntryFlowValues();
   await loginAsDefaultUser();
 
-  if (config.orderEntryUseImpersonation) {
+  if (shouldUseOrderEntryImpersonation({ impersonateUserProfile: flowValues.impersonateUserProfile }, [env.impersonateUser, env.orderEntryImpersonateUser])) {
     await impersonateConfiguredUser();
   }
 

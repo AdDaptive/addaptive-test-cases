@@ -6,6 +6,8 @@ type OrderEntryDbRow = {
   test_case_name: string;
   ad_server: string;
   order_action: string;
+  username: string | null;
+  password: string | null;
   impersonate_user_profile: string | null;
   display_tabs: string | null;
   objectives_type: string | null;
@@ -331,13 +333,24 @@ function parseOrderEntryRange(rawValue?: string): { start: number; end: number }
     return undefined;
   }
 
-  const match = rawValue.trim().match(/^(\d+)\s*-\s*(\d+)$/);
-  if (!match) {
+  const trimmed = rawValue.trim();
+  const singleMatch = trimmed.match(/^(\d+)$/);
+  if (singleMatch) {
+    const value = Number(singleMatch[1]);
+    if (!Number.isFinite(value) || value < 1) {
+      return undefined;
+    }
+
+    return { start: value, end: value };
+  }
+
+  const rangeMatch = trimmed.match(/^(\d+)\s*-\s*(\d+)$/);
+  if (!rangeMatch) {
     return undefined;
   }
 
-  const start = Number(match[1]);
-  const end = Number(match[2]);
+  const start = Number(rangeMatch[1]);
+  const end = Number(rangeMatch[2]);
   if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) {
     return undefined;
   }
@@ -364,28 +377,26 @@ export function loadOrderEntryCaseSummaries(objectIds = getSelectedOrderEntryObj
   const normalizedAdServer = selectedAdServer ? normalizeFilterValue(selectedAdServer) : undefined;
   const canonicalAdServer = normalizedAdServer ? allowedOrderEntryAdServersByNormalized.get(normalizedAdServer) : undefined;
   const canonicalOrderAction = selectedOrderAction ? normalizeFilterValue(selectedOrderAction) : undefined;
+  const hasDirectSelector = ids.length > 0 || Boolean(selectedRange);
 
-  if (!selectedAdServer) {
-    throw new Error(
-      'Missing required batch filter: ADDAPTIVE_ORDER_ENTRY_AD_SERVER. Set it to run order-entry batch cases.'
-    );
-  }
-
-  if (!canonicalAdServer) {
+  if (selectedAdServer && !canonicalAdServer) {
     throw new Error(
       `Invalid ADDAPTIVE_ORDER_ENTRY_AD_SERVER "${selectedAdServer}". Allowed values: ${allowedOrderEntryAdServers.join(', ')}.`
     );
   }
 
-  if (!selectedOrderAction) {
+  if (
+    selectedOrderAction &&
+    (!canonicalOrderAction || !allowedOrderEntryActionsSet.has(canonicalOrderAction as (typeof allowedOrderEntryActions)[number]))
+  ) {
     throw new Error(
-      'Missing required batch filter: ADDAPTIVE_ORDER_ENTRY_ACTION. Set it to either "create" or "edit".'
+      `Invalid ADDAPTIVE_ORDER_ENTRY_ACTION "${selectedOrderAction}". Allowed values: ${allowedOrderEntryActions.join(', ')}.`
     );
   }
 
-  if (!canonicalOrderAction || !allowedOrderEntryActionsSet.has(canonicalOrderAction as (typeof allowedOrderEntryActions)[number])) {
+  if (!hasDirectSelector && !canonicalAdServer && !canonicalOrderAction) {
     throw new Error(
-      `Invalid ADDAPTIVE_ORDER_ENTRY_ACTION "${selectedOrderAction}". Allowed values: ${allowedOrderEntryActions.join(', ')}.`
+      'Missing order-entry selection. Set one of ADDAPTIVE_ORDER_ENTRY_DB_OBJECT_ID, ADDAPTIVE_ORDER_ENTRY_DB_IDS, ADDAPTIVE_ORDER_ENTRY_DB_RANGE, or use ADDAPTIVE_ORDER_ENTRY_AD_SERVER/ADDAPTIVE_ORDER_ENTRY_ACTION filters.'
     );
   }
 
@@ -393,10 +404,14 @@ export function loadOrderEntryCaseSummaries(objectIds = getSelectedOrderEntryObj
     filters.push(`oe.object_id in (${ids.map((id) => sqlLiteral(id)).join(', ')})`);
   }
 
-  filters.push(
-    `regexp_replace(lower(oe.ad_server), '[^a-z0-9]+', '', 'g') = ${sqlLiteral(normalizeFilterValue(canonicalAdServer))}`
-  );
-  filters.push(`regexp_replace(lower(oe.order_action), '[^a-z0-9]+', '', 'g') = ${sqlLiteral(canonicalOrderAction)}`);
+  if (canonicalAdServer) {
+    filters.push(
+      `regexp_replace(lower(oe.ad_server), '[^a-z0-9]+', '', 'g') = ${sqlLiteral(normalizeFilterValue(canonicalAdServer))}`
+    );
+  }
+  if (canonicalOrderAction) {
+    filters.push(`regexp_replace(lower(oe.order_action), '[^a-z0-9]+', '', 'g') = ${sqlLiteral(canonicalOrderAction)}`);
+  }
 
   const whereClause = filters.length > 0 ? `where ${filters.join(' and ')}` : '';
   const rangeClause = selectedRange ? `where selected."rowNumber" between ${selectedRange.start} and ${selectedRange.end}` : '';
@@ -435,6 +450,7 @@ export function buildOrderEntryCaseSelectionError(objectIds = getSelectedOrderEn
   const activeRange = config.orderEntryDbRange;
   const activeIds = config.orderEntryDbIds;
   const activeObjectId = config.orderEntryDbObjectId;
+  const hasDirectSelector = ids.length > 0 || Boolean(selectedRange) || Boolean(activeObjectId);
   const filterSummary = [
     `adServer=${selectedAdServer || '<unset>'}`,
     `orderAction=${selectedOrderAction || '<unset>'}`,
@@ -443,12 +459,19 @@ export function buildOrderEntryCaseSelectionError(objectIds = getSelectedOrderEn
     `range=${activeRange || '<unset>'}`
   ].join(', ');
 
-  if (!canonicalAdServer || !canonicalOrderAction) {
+  if (!hasDirectSelector && !canonicalAdServer && !canonicalOrderAction) {
     return `No order-entry rows matched the current selectors/filters. Active filters: ${filterSummary}.`;
   }
-
-  const normalizedAdServerFilter = sqlLiteral(normalizeFilterValue(canonicalAdServer));
-  const normalizedOrderActionFilter = sqlLiteral(canonicalOrderAction);
+  const sampleFilters: string[] = [];
+  if (canonicalAdServer) {
+    sampleFilters.push(
+      `regexp_replace(lower(oe.ad_server), '[^a-z0-9]+', '', 'g') = ${sqlLiteral(normalizeFilterValue(canonicalAdServer))}`
+    );
+  }
+  if (canonicalOrderAction) {
+    sampleFilters.push(`regexp_replace(lower(oe.order_action), '[^a-z0-9]+', '', 'g') = ${sqlLiteral(canonicalOrderAction)}`);
+  }
+  const sampleWhereClause = sampleFilters.length > 0 ? `where ${sampleFilters.join(' and ')}` : '';
   const sampleMatches = queryJson<OrderEntryCaseSummary[]>(`
     select
       oe.object_id as "objectId",
@@ -456,8 +479,7 @@ export function buildOrderEntryCaseSelectionError(objectIds = getSelectedOrderEn
       oe.ad_server as "adServer",
       oe.order_action as "orderAction"
     from order_entry_suite oe
-    where regexp_replace(lower(oe.ad_server), '[^a-z0-9]+', '', 'g') = ${normalizedAdServerFilter}
-      and regexp_replace(lower(oe.order_action), '[^a-z0-9]+', '', 'g') = ${normalizedOrderActionFilter}
+    ${sampleWhereClause}
     order by oe.object_id::int
     limit 10
   `);
@@ -487,6 +509,8 @@ export function buildOrderEntryCaseSelectionError(objectIds = getSelectedOrderEn
 
   let rangeDetails = '';
   if (selectedRange) {
+    const rangeFilters = [...sampleFilters];
+    const rangeWhereClause = rangeFilters.length > 0 ? `where ${rangeFilters.join(' and ')}` : '';
     const rangedRows = queryJson<Array<OrderEntryCaseSummary & { rowNumber: number }>>(`
       select
         selected."objectId",
@@ -502,15 +526,14 @@ export function buildOrderEntryCaseSelectionError(objectIds = getSelectedOrderEn
           oe.order_action as "orderAction",
           row_number() over (order by oe.object_id::int) as "rowNumber"
         from order_entry_suite oe
-        where regexp_replace(lower(oe.ad_server), '[^a-z0-9]+', '', 'g') = ${normalizedAdServerFilter}
-          and regexp_replace(lower(oe.order_action), '[^a-z0-9]+', '', 'g') = ${normalizedOrderActionFilter}
+        ${rangeWhereClause}
       ) selected
       where selected."rowNumber" between ${selectedRange.start} and ${selectedRange.end}
       order by selected."rowNumber"
     `);
 
     if (rangedRows.length === 0) {
-      rangeDetails = ` Positional range ${selectedRange.start}-${selectedRange.end} returned no rows after filtering.`;
+      rangeDetails = ` Positional range ${selectedRange.start}-${selectedRange.end} returned no rows${sampleFilters.length > 0 ? ' after filtering' : ''}.`;
     } else {
       rangeDetails = ` Positional range ${selectedRange.start}-${selectedRange.end} resolved to object IDs: ${rangedRows
         .map((row) => row.objectId)
@@ -520,8 +543,8 @@ export function buildOrderEntryCaseSelectionError(objectIds = getSelectedOrderEn
 
   const sampleSummary =
     sampleMatches.length > 0
-      ? ` First matching IDs for ${canonicalAdServer}/${canonicalOrderAction}: ${sampleMatches.map((row) => row.objectId).join(', ')}.`
-      : ` No rows exist for ${canonicalAdServer}/${canonicalOrderAction} in order_entry_suite.`;
+      ? ` First matching IDs${canonicalAdServer || canonicalOrderAction ? ` for ${canonicalAdServer || '*'}\/${canonicalOrderAction || '*'}` : ''}: ${sampleMatches.map((row) => row.objectId).join(', ')}.`
+      : ` No rows exist${canonicalAdServer || canonicalOrderAction ? ` for ${canonicalAdServer || '*'}\/${canonicalOrderAction || '*'}` : ''} in order_entry_suite.`;
 
   return `No order-entry rows matched the current selectors/filters. Active filters: ${filterSummary}.${idDetails}${rangeDetails}${sampleSummary}`;
 }
@@ -596,6 +619,8 @@ export function loadOrderEntryCaseData(): OrderEntryDbRow | null {
       oe.test_case_name,
       oe.ad_server,
       oe.order_action,
+      oe.username,
+      oe.password,
       oe.impersonate_user_profile,
       oe.display_tabs,
       oe.objectives_type,
@@ -1063,6 +1088,8 @@ export function loadOrderEntryCreativeValues(): {
 }
 
 export function loadOrderEntryFlowValues(): {
+  username?: string;
+  password?: string;
   impersonateUserProfile?: string;
   tabs: string[];
   audienceList: string[];
@@ -1083,6 +1110,8 @@ export function loadOrderEntryFlowValues(): {
   }
 
   return {
+    username: sanitizeValue(row.username),
+    password: sanitizeValue(row.password),
     impersonateUserProfile: sanitizeValue(row.impersonate_user_profile),
     tabs: resolveOrderEntryTabs(row.ad_server),
     audienceList: parseMultiLine(row.audience_list),

@@ -172,7 +172,9 @@ function resolveCreativeAssetPath(filePath?: string): string | undefined {
     filePath,
     path.resolve(process.cwd(), filePath),
     path.resolve(process.cwd(), 'Data Files', 'Frontend', 'Order Entry', 'Creative Assets', filePath),
-    path.resolve(__dirname, '..', '..', 'Data Files', 'Frontend', 'Order Entry', 'Creative Assets', filePath)
+    path.resolve(__dirname, '..', '..', 'Data Files', 'Frontend', 'Order Entry', 'Creative Assets', filePath),
+    path.resolve(process.cwd(), '..', 'katalon-test-cases', 'Data Files', 'Frontend', 'Order Entry', 'Creative Assets', filePath),
+    path.resolve(__dirname, '..', '..', '..', 'katalon-test-cases', 'Data Files', 'Frontend', 'Order Entry', 'Creative Assets', filePath)
   ];
 
   return candidates.find((candidate) => fs.existsSync(candidate));

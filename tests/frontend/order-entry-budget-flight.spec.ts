@@ -1,7 +1,9 @@
 import { test } from '../../fixtures/session';
 import { configureOrderEntryBudgetFlight, openOrderEntryPage } from '../../pages/order-entry';
-import { requireOrderEntryBudgetFlightValues } from '../../utils/order-entry-db';
+import { requireOrderEntryBudgetFlightValues, requireOrderEntryFlowValues } from '../../utils/order-entry-db';
 import { config } from '../../utils/config';
+import { env } from '../../utils/env';
+import { shouldUseOrderEntryImpersonation } from '../../utils/auth-config';
 
 test('frontend: order entry budget and flight tab is scriptable', async ({
   page,
@@ -9,10 +11,11 @@ test('frontend: order entry budget and flight tab is scriptable', async ({
   impersonateConfiguredUser
 }) => {
   const dbValues = requireOrderEntryBudgetFlightValues();
+  const flowValues = requireOrderEntryFlowValues();
 
   await loginAsDefaultUser();
 
-  if (config.orderEntryUseImpersonation) {
+  if (shouldUseOrderEntryImpersonation({ impersonateUserProfile: flowValues.impersonateUserProfile }, [env.impersonateUser, env.orderEntryImpersonateUser])) {
     await impersonateConfiguredUser();
   }
 

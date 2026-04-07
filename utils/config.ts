@@ -94,17 +94,29 @@ export const config = {
   get loginUser(): string {
     return profiled('ADDAPTIVE_LOGIN_USER', 'LOGIN_USER');
   },
+  get loginUserOverride(): string | undefined {
+    return optional('ADDAPTIVE_LOGIN_USER_OVERRIDE');
+  },
   get loginPassword(): string {
     return profiled('ADDAPTIVE_LOGIN_PASSWORD', 'LOGIN_PASSWORD');
   },
+  get loginPasswordOverride(): string | undefined {
+    return optional('ADDAPTIVE_LOGIN_PASSWORD_OVERRIDE');
+  },
   get impersonateUser(): string {
     return profiled('ADDAPTIVE_IMPERSONATE_USER', 'IMPERSONATE_USER');
+  },
+  get impersonateUserOverride(): string | undefined {
+    return optional('ADDAPTIVE_IMPERSONATE_USER_OVERRIDE');
   },
   get orderEntryImpersonateUser(): string {
     return read('ADDAPTIVE_ORDER_ENTRY_IMPERSONATE_USER');
   },
   get orderEntryUseImpersonation(): boolean {
     return bool('ADDAPTIVE_ORDER_ENTRY_USE_IMPERSONATION');
+  },
+  get orderEntryUseImpersonationOverride(): string | undefined {
+    return optional('ADDAPTIVE_ORDER_ENTRY_USE_IMPERSONATION');
   },
   get orderEntrySaveDraft(): boolean {
     return bool('ADDAPTIVE_ORDER_ENTRY_SAVE_DRAFT');

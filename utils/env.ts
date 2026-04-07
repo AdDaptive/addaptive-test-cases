@@ -11,7 +11,10 @@ export const env = {
   frontendUrl: config.frontendUrl,
   backendUrl: config.backendUrl,
   loginUser: config.loginUser,
+  loginUserOverride: config.loginUserOverride,
   loginPassword: config.loginPassword,
+  loginPasswordOverride: config.loginPasswordOverride,
   impersonateUser: config.impersonateUser,
+  impersonateUserOverride: config.impersonateUserOverride,
   orderEntryImpersonateUser: config.orderEntryImpersonateUser
 };

@@ -5,6 +5,8 @@ type InsightStudioDbRow = {
   id: string;
   object_id: string | number | null;
   test_case_name: string | null;
+  username: string | null;
+  password: string | null;
   template_type: string | null;
   report_name: string | null;
   status: string | null;
@@ -47,6 +49,7 @@ type InsightStudioExportTargetRow = {
 
 let cachedKey: string | null = null;
 let cachedRow: InsightStudioDbRow | null = null;
+let cachedColumns: Set<string> | null = null;
 
 function currentCacheKey(): string {
   return [config.insightDbId || '', config.insightDbTestCaseName || '', config.releaseName || ''].join('|');
@@ -63,6 +66,22 @@ function sanitizeValue(value?: string | null): string | undefined {
   }
 
   return trimmed;
+}
+
+function getInsightStudioTableColumns(): Set<string> {
+  if (cachedColumns) {
+    return cachedColumns;
+  }
+
+  const rows = queryJson<Array<{ column_name: string }>>(`
+    select column_name
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'insight_studio_suite'
+  `);
+
+  cachedColumns = new Set(rows.map((row) => row.column_name));
+  return cachedColumns;
 }
 
 function parseLineSeparatedValues(value?: string | null): string[] {
@@ -150,6 +169,8 @@ export function loadInsightStudioCaseData(): InsightStudioDbRow | null {
       s.id,
       s.object_id,
       s.test_case_name,
+      ${getInsightStudioTableColumns().has('username') ? 's.username' : 'null::text'} as username,
+      ${getInsightStudioTableColumns().has('password') ? 's.password' : 'null::text'} as password,
       s.template_type,
       s.report_name,
       s.status,
@@ -178,6 +199,8 @@ export function loadInsightStudioCaseData(): InsightStudioDbRow | null {
 }
 
 export function requireInsightStudioFlowValues(): {
+  username?: string;
+  password?: string;
   reportAction: 'create' | 'edit';
   templateType?: string;
   reportName?: string;
@@ -201,6 +224,8 @@ export function requireInsightStudioFlowValues(): {
   }
 
   return {
+    username: sanitizeValue(row.username),
+    password: sanitizeValue(row.password),
     reportAction: sanitizeValue(row.report_action)?.toLowerCase() === 'edit' ? 'edit' : 'create',
     templateType: sanitizeValue(row.template_type),
     reportName: convertInsightStudioMacros(row.report_name, row.test_case_name),

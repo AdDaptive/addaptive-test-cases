@@ -6,6 +6,8 @@ export type ClientSettingsSuiteGroup = {
   objectId: string;
   testCaseName: string;
   status?: string;
+  username?: string;
+  password?: string;
   impersonateUserProfile?: string;
   clientName?: string;
   backendClientName?: string;
@@ -197,6 +199,8 @@ export function loadClientSettingsSuiteGroups(filters: {
   const impersonateUserProfileSelect = groupTableColumns.has('impersonate_user_profile')
     ? 'g.impersonate_user_profile'
     : 'null::text';
+  const usernameSelect = groupTableColumns.has('username') ? 'g.username' : 'null::text';
+  const passwordSelect = groupTableColumns.has('password') ? 'g.password' : 'null::text';
   const clientNameSelect = groupTableColumns.has('client_name') ? 'g.client_name' : 'null::text';
   const statusSelect = groupTableColumns.has('status') ? 'g.status' : 'null::text';
   const adServerSelect = groupTableColumns.has('ad_server') ? 'g.ad_server' : `'MEDIAMATH'`;
@@ -218,6 +222,8 @@ export function loadClientSettingsSuiteGroups(filters: {
     objectId: string;
     testCaseName: string;
     status?: string;
+    username?: string;
+    password?: string;
     impersonateUserProfile?: string;
     clientName?: string;
     backendClientName?: string;
@@ -236,6 +242,8 @@ export function loadClientSettingsSuiteGroups(filters: {
       selected."objectId",
       selected."testCaseName",
       selected."status",
+      selected."username",
+      selected."password",
       selected."impersonateUserProfile",
       selected."clientName",
       selected."backendClientName",
@@ -254,6 +262,8 @@ export function loadClientSettingsSuiteGroups(filters: {
         g.object_id::text as "objectId",
         g.test_case_name as "testCaseName",
         ${statusSelect} as "status",
+        ${usernameSelect} as "username",
+        ${passwordSelect} as "password",
         ${impersonateUserProfileSelect} as "impersonateUserProfile",
         ${clientNameSelect} as "clientName",
         ${clientNameSelect} as "backendClientName",
@@ -299,6 +309,8 @@ export function loadClientSettingsSuiteGroups(filters: {
         objectId: row.objectId,
         testCaseName: row.testCaseName,
         status: row.status,
+        username: sanitizeValue(row.username),
+        password: sanitizeValue(row.password),
         impersonateUserProfile: row.impersonateUserProfile,
         clientName: row.clientName,
         backendClientName: row.backendClientName,
