@@ -1109,18 +1109,21 @@ export function loadOrderEntryFlowValues(): {
     return null;
   }
 
+  const splitItems = parseMultiLine(row.splits_list);
+  const tabs = resolveOrderEntryTabs(row.ad_server).filter((tab) => tab !== 'Splits' || splitItems.length > 0);
+
   return {
     username: sanitizeValue(row.username),
     password: sanitizeValue(row.password),
     impersonateUserProfile: sanitizeValue(row.impersonate_user_profile),
-    tabs: resolveOrderEntryTabs(row.ad_server),
+    tabs,
     audienceList: parseMultiLine(row.audience_list),
     creativesList: parseMultiLine(row.creatives_list),
     bulkImportCreativesType: sanitizeValue(row.bulk_import_creatives_type),
     bulkImportUse1stUrlForAll: sanitizeValue(row.bulk_import_use_1st_url_for_all),
     bulkImportUse1stImageForAll: sanitizeValue(row.bulk_import_use_1st_image_for_all),
     bulkImportUse1stIconForAll: sanitizeValue(row.bulk_import_use_1st_icon_for_all),
-    splitsList: parseMultiLine(row.splits_list),
+    splitsList: splitItems,
     splitsAllocationList: parseMultiLine(row.splits_allocation_list),
     splitsDivideEqually: sanitizeValue(row.splits_divide_equally),
     orderSubmitType: sanitizeValue(row.order_submit_type),
