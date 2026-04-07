@@ -163,6 +163,44 @@ function parseList(value?: string): string[] {
     .filter(Boolean);
 }
 
+function toCapitalizedWords(value: string): string {
+  return value
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ');
+}
+
+function buildCapUnitCandidates(unit: string): string[] {
+  const capitalized = toCapitalizedWords(unit);
+  const candidates = new Set<string>([unit, capitalized]);
+  const singularized = capitalized.replace(/\b(Minutes|Hours|Days|Weeks|Months)\b/g, (match) =>
+    match.endsWith('s') ? match.slice(0, -1) : match
+  );
+
+  if (singularized) {
+    candidates.add(singularized);
+  }
+
+  return [...candidates].filter(Boolean);
+}
+
+async function selectCapUnit(select: Locator, unit: string): Promise<void> {
+  const optionLabels = await select.locator('option').allTextContents();
+
+  for (const candidate of buildCapUnitCandidates(unit)) {
+    if (optionLabels.some((label) => label.trim() === candidate)) {
+      await select.selectOption({ label: candidate });
+      return;
+    }
+  }
+
+  throw new Error(
+    `Could not find cap unit option for "${unit}". Available options: ${JSON.stringify(optionLabels.map((label) => label.trim()))}.`
+  );
+}
+
 function resolveCreativeAssetPath(filePath?: string): string | undefined {
   if (!hasValue(filePath)) {
     return undefined;
@@ -2904,9 +2942,10 @@ export async function configureOrderEntryInventory(
   }
 
   if (hasValue(options.frequencyCapUnit)) {
-    await katalonLocator(page, 'Object Repository/Frontend/Order-Entry/Inventory-Tab/select_InventoryFrequencyList').selectOption({
-      label: options.frequencyCapUnit
-    });
+    await selectCapUnit(
+      katalonLocator(page, 'Object Repository/Frontend/Order-Entry/Inventory-Tab/select_InventoryFrequencyList'),
+      options.frequencyCapUnit
+    );
   }
 
   if (options.recencyCapEnabled || hasValue(options.recencyCap) || hasValue(options.recencyCapUnit)) {
@@ -2921,9 +2960,10 @@ export async function configureOrderEntryInventory(
   }
 
   if (hasValue(options.recencyCapUnit)) {
-    await katalonLocator(page, 'Object Repository/Frontend/Order-Entry/Inventory-Tab/select_InventoryRecencyList').selectOption({
-      label: options.recencyCapUnit
-    });
+    await selectCapUnit(
+      katalonLocator(page, 'Object Repository/Frontend/Order-Entry/Inventory-Tab/select_InventoryRecencyList'),
+      options.recencyCapUnit
+    );
   }
 
 }

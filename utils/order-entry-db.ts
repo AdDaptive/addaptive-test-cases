@@ -985,7 +985,7 @@ export function loadOrderEntryInventoryValues(): {
         };
       }
     } else {
-      const match = sanitized.match(/^.+?\s+per\s+(.+?)\s+(.+)$/i);
+      const match = sanitized.match(/^.+?\s+per\s+(\d+)\s+(.+)$/i);
       if (match) {
         return {
           value: sanitizeValue(match[1]),
