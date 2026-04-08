@@ -2,7 +2,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
-const reportsRoot = path.resolve(__dirname, '..', 'playwright-report');
+const projectRoot = path.resolve(__dirname, '..');
+const reportsRoot = path.join(projectRoot, 'playwright-report');
+const lastRunPath = path.join(projectRoot, 'test-results', '.last-run.json');
+const staleReportThresholdMs = 60 * 1000;
 
 function listReportDirectories(rootDir) {
   if (!fs.existsSync(rootDir)) {
@@ -20,7 +23,7 @@ function listReportDirectories(rootDir) {
         name: entry.name,
         fullPath,
         indexPath,
-        mtimeMs: stats.mtimeMs
+        mtimeMs: Math.max(stats.mtimeMs, fs.existsSync(indexPath) ? fs.statSync(indexPath).mtimeMs : 0)
       };
     })
     .filter((entry) => fs.existsSync(entry.indexPath))
@@ -45,16 +48,85 @@ function findLatestReport(rootDir) {
   return candidates[0];
 }
 
+function readLastRunMetadata(lastRunFile) {
+  if (!fs.existsSync(lastRunFile)) {
+    return null;
+  }
+
+  const stats = fs.statSync(lastRunFile);
+  let summary = null;
+
+  try {
+    summary = JSON.parse(fs.readFileSync(lastRunFile, 'utf8'));
+  } catch {
+    summary = null;
+  }
+
+  return {
+    mtimeMs: stats.mtimeMs,
+    summary
+  };
+}
+
+function maybeWarnAboutStaleReport(latestReport, lastRun) {
+  if (!latestReport || !lastRun) {
+    return;
+  }
+
+  const ageGapMs = lastRun.mtimeMs - latestReport.mtimeMs;
+  if (ageGapMs <= staleReportThresholdMs) {
+    return;
+  }
+
+  const lastRunStatus = typeof lastRun.summary?.status === 'string' ? lastRun.summary.status : 'unknown';
+  console.warn(
+    [
+      'Warning: the newest saved Playwright HTML report is older than the most recent recorded test run.',
+      `Saved report time: ${new Date(latestReport.mtimeMs).toISOString()}.`,
+      `Last recorded test run: ${new Date(lastRun.mtimeMs).toISOString()} (status: ${lastRunStatus}).`,
+      'The most recent run likely did not generate an HTML report, which can happen when overriding reporters via the CLI',
+      '(for example: --reporter=line). Opening the newest saved HTML report instead.'
+    ].join(' ')
+  );
+}
+
+const lastRun = readLastRunMetadata(lastRunPath);
 const latestReport = findLatestReport(reportsRoot);
 
 if (!latestReport) {
-  console.error(`No saved Playwright reports found under ${reportsRoot}`);
+  if (lastRun) {
+    const lastRunStatus = typeof lastRun.summary?.status === 'string' ? lastRun.summary.status : 'unknown';
+    console.error(
+      `No saved Playwright HTML reports found under ${reportsRoot}. ` +
+        `The most recent recorded test run completed at ${new Date(lastRun.mtimeMs).toISOString()} ` +
+        `(status: ${lastRunStatus}) and may have used a non-HTML reporter such as --reporter=line.`
+    );
+  } else {
+    console.error(`No saved Playwright reports found under ${reportsRoot}`);
+  }
   process.exit(1);
 }
 
-const child = spawnSync('npx', ['playwright', 'show-report', latestReport.fullPath], {
-  stdio: 'inherit',
-  shell: process.platform === 'win32'
+maybeWarnAboutStaleReport(latestReport, lastRun);
+
+function resolvePlaywrightCommand(reportPath) {
+  try {
+    const playwrightCli = require.resolve('@playwright/test/cli');
+    return {
+      command: process.execPath,
+      args: [playwrightCli, 'show-report', reportPath]
+    };
+  } catch {
+    return {
+      command: process.platform === 'win32' ? 'npx.cmd' : 'npx',
+      args: ['playwright', 'show-report', reportPath]
+    };
+  }
+}
+
+const { command, args } = resolvePlaywrightCommand(latestReport.fullPath);
+const child = spawnSync(command, args, {
+  stdio: 'inherit'
 });
 
 if (child.error) {

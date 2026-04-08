@@ -308,7 +308,7 @@ export function loadAudienceCaseSummaries(objectIds = getSelectedAudienceObjectI
     filters.push(`a.id in (${ids.map((id) => sqlLiteral(id)).join(', ')})`);
   }
 
-  const whereClause = `where ${filters.join(' and ')}`;
+  const whereClause = filters.length > 0 ? `where ${filters.join(' and ')}` : '';
   const rangeClause = selectedRange ? `where selected."rowNumber" between ${selectedRange.start} and ${selectedRange.end}` : '';
 
   const query = `
